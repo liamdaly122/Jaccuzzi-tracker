@@ -74,6 +74,7 @@ const dosingConstantsSchema = z.object({
 export const settingsSchema = z.object({
   sanitizerType: z.enum(["chlorine", "bromine"]),
   volumeLitres: z.number().positive().max(100000),
+  avgDailyBathers: z.number().min(0).max(100),
   targetRanges: targetRangesSchema,
   dosingConstants: dosingConstantsSchema,
 });

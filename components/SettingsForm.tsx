@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { SpaSettings } from "@/lib/types";
 import type { TargetRanges, DosingConstants } from "@/lib/chemistry";
+import { computeWaterChangeIntervalDays } from "@/lib/water";
 import { Button, Card, Field, inputClass } from "./ui";
 
 interface Props {
@@ -46,6 +47,9 @@ export default function SettingsForm({ settings, icsUrl }: Props) {
   const router = useRouter();
   const [sanitizerType, setSanitizerType] = useState(settings.sanitizer_type);
   const [volume, setVolume] = useState(String(settings.volume_litres));
+  const [bathers, setBathers] = useState(
+    String(settings.avg_daily_bathers ?? 1.5),
+  );
   const [ranges, setRanges] = useState<TargetRanges>(settings.target_ranges);
   const [constants, setConstants] = useState<DosingConstants>(
     settings.dosing_constants,
@@ -63,6 +67,7 @@ export default function SettingsForm({ settings, icsUrl }: Props) {
       body: JSON.stringify({
         sanitizerType,
         volumeLitres: Number(volume),
+        avgDailyBathers: Number(bathers),
         targetRanges: ranges,
         dosingConstants: constants,
       }),
@@ -112,6 +117,25 @@ export default function SettingsForm({ settings, icsUrl }: Props) {
             className={inputClass}
           />
         </Field>
+      </Card>
+
+      {/* Usage / water changes */}
+      <Card>
+        <Field
+          label="People per day (on average)"
+          hint="Used to work out how often to drain & refill. Even light use counts — half a person a day is fine to enter as 0.5."
+        >
+          <input
+            type="number"
+            inputMode="decimal"
+            step="0.5"
+            min={0}
+            value={bathers}
+            onChange={(e) => setBathers(e.target.value)}
+            className={inputClass}
+          />
+        </Field>
+        <WaterChangeHint volume={Number(volume)} bathers={Number(bathers)} />
       </Card>
 
       {/* Advanced: target ranges */}
@@ -239,5 +263,29 @@ export default function SettingsForm({ settings, icsUrl }: Props) {
         </a>
       </Card>
     </div>
+  );
+}
+
+// Live "you should change the water roughly every N days" hint. Recomputes as
+// the volume or bathers inputs change (uses the same pure formula as the app).
+function WaterChangeHint({
+  volume,
+  bathers,
+}: {
+  volume: number;
+  bathers: number;
+}) {
+  if (!Number.isFinite(volume) || volume <= 0) return null;
+  const { intervalDays, cappedByMax } = computeWaterChangeIntervalDays(
+    volume,
+    bathers,
+  );
+  return (
+    <p className="mt-2 rounded-lg bg-brand-50 px-3 py-2 text-sm text-brand-800">
+      💧 Suggested drain &amp; refill: about every{" "}
+      <strong>{intervalDays} days</strong>
+      {cappedByMax ? " (light use — quarterly is plenty)" : ""}. You can apply
+      this to your schedule from the <strong>Today</strong> screen.
+    </p>
   );
 }

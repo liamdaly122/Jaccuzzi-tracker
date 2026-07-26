@@ -45,12 +45,18 @@ create table if not exists spa_settings (
     "sodiumBromideGPer1000L": 6,
     "mpsShockGPer1000L": 17
   }'::jsonb,
+  avg_daily_bathers numeric(5, 2) not null default 1.5,
   updated_at timestamptz not null default now(),
   constraint spa_settings_single_row check (id = 1)
 );
 
 insert into spa_settings (id) values (1)
 on conflict (id) do nothing;
+
+-- Added in a later update. Safe to run again on an existing database — this
+-- adds the "average daily bathers" column only if it isn't there yet.
+alter table spa_settings
+  add column if not exists avg_daily_bathers numeric(5, 2) not null default 1.5;
 
 -- -----------------------------------------------------------------------------
 -- test_readings: each time you test your water with a strip.
