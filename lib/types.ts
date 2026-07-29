@@ -74,6 +74,14 @@ export interface NotificationLogRow {
   created_at: string;
 }
 
+export interface UsageLogRow {
+  id: number;
+  used_at: string;
+  bathers: number;
+  note: string | null;
+  created_at: string;
+}
+
 // Human-readable labels for chemical keys (used in the UI and logs).
 export const CHEMICAL_LABELS: Record<ChemicalKey, string> = {
   ta_increaser: "Alkalinity increaser",

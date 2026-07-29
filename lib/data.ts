@@ -17,6 +17,7 @@ import type {
   TestReadingRow,
   DosingLogRow,
   NotificationLogRow,
+  UsageLogRow,
 } from "./types";
 
 // Fetch the single settings row (id = 1). Throws with a friendly message if the
@@ -97,6 +98,31 @@ export async function getRecentDosing(limit = 30): Promise<DosingLogRow[]> {
     .limit(limit);
   if (error) throw new Error(`Could not load dosing log: ${error.message}`);
   return (data ?? []) as DosingLogRow[];
+}
+
+export async function getRecentUsage(limit = 30): Promise<UsageLogRow[]> {
+  const supabase = getSupabase();
+  const { data, error } = await supabase
+    .from("usage_log")
+    .select("*")
+    .order("used_at", { ascending: false })
+    .limit(limit);
+  if (error) throw new Error(`Could not load usage log: ${error.message}`);
+  return (data ?? []) as UsageLogRow[];
+}
+
+// Sum of bathers logged since a given time (used to measure water freshness
+// since the last drain). Returns 0 if nothing since then.
+export async function getBathersSince(sinceIso: string | null): Promise<number> {
+  const supabase = getSupabase();
+  let query = supabase.from("usage_log").select("bathers");
+  if (sinceIso) query = query.gte("used_at", sinceIso);
+  const { data, error } = await query;
+  if (error) throw new Error(`Could not sum usage: ${error.message}`);
+  return (data ?? []).reduce(
+    (sum, row: { bathers: number }) => sum + Number(row.bathers),
+    0,
+  );
 }
 
 // The most recent daily-check row, so the dashboard can show "last checked"

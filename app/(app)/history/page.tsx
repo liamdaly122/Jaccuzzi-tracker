@@ -1,8 +1,13 @@
 import SetupNeeded from "@/components/SetupNeeded";
 import DeleteReadingButton from "@/components/DeleteReadingButton";
 import { Card } from "@/components/ui";
-import { getRecentReadings, getRecentDosing, getSettings } from "@/lib/data";
-import { CHEMICAL_LABELS } from "@/lib/types";
+import {
+  getRecentReadings,
+  getRecentDosing,
+  getSettings,
+  getRecentUsage,
+} from "@/lib/data";
+import { CHEMICAL_LABELS, type UsageLogRow } from "@/lib/types";
 import { formatDateTime } from "@/lib/display";
 
 export const dynamic = "force-dynamic";
@@ -19,6 +24,14 @@ export default async function HistoryPage() {
     return (
       <SetupNeeded message={err instanceof Error ? err.message : "Unknown error"} />
     );
+  }
+
+  // Usage is optional (its table may not exist yet) — never break the page.
+  let usage: UsageLogRow[] = [];
+  try {
+    usage = await getRecentUsage(50);
+  } catch {
+    usage = [];
   }
 
   const isChlorine = settings.sanitizer_type === "chlorine";
@@ -106,6 +119,26 @@ export default async function HistoryPage() {
           </div>
         )}
       </section>
+
+      {usage.length > 0 ? (
+        <section>
+          <h2 className="mb-2 font-semibold text-slate-700">Recent soaks</h2>
+          <div className="space-y-2">
+            {usage.map((u) => (
+              <Card key={u.id}>
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-medium text-slate-800">
+                    🛁 {u.bathers} {u.bathers === 1 ? "person" : "people"}
+                  </p>
+                  <p className="text-xs text-slate-400">
+                    {formatDateTime(u.used_at)}
+                  </p>
+                </div>
+              </Card>
+            ))}
+          </div>
+        </section>
+      ) : null}
     </div>
   );
 }

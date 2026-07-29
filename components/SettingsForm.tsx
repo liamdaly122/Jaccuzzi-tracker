@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { SpaSettings } from "@/lib/types";
 import type { TargetRanges, DosingConstants } from "@/lib/chemistry";
@@ -252,15 +253,24 @@ export default function SettingsForm({ settings, icsUrl }: Props) {
         )}
       </Card>
 
-      {/* History link */}
+      {/* Links */}
       <Card>
-        <a
+        <Link
           href="/history"
           className="flex items-center justify-between font-medium text-slate-700"
         >
           <span>📜 View history (readings &amp; doses)</span>
           <span className="text-brand-600">→</span>
-        </a>
+        </Link>
+      </Card>
+      <Card>
+        <Link
+          href="/guides"
+          className="flex items-center justify-between font-medium text-slate-700"
+        >
+          <span>📋 Guides &amp; help</span>
+          <span className="text-brand-600">→</span>
+        </Link>
       </Card>
     </div>
   );

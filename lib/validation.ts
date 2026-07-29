@@ -80,6 +80,13 @@ export const settingsSchema = z.object({
 });
 export type SettingsInput = z.infer<typeof settingsSchema>;
 
+export const usageSchema = z.object({
+  bathers: z.number().int().positive().max(50),
+  usedAt: z.string().datetime().optional(),
+  note: z.string().max(2000).optional().nullable(),
+});
+export type UsageInput = z.infer<typeof usageSchema>;
+
 export const taskUpdateSchema = z.object({
   frequencyDays: z.number().int().positive().max(3650),
 });

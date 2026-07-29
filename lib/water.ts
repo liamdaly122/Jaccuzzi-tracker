@@ -64,6 +64,44 @@ export function computeWaterChangeIntervalDays(
   };
 }
 
+// Total "person-soaks" the water can take before a change is due. Same PHTA
+// basis as the interval formula: gallons / 3 is the cumulative bather capacity.
+export function batherCapacity(
+  volumeLitres: number,
+  opts: WaterChangeOptions = {},
+): number {
+  if (!Number.isFinite(volumeLitres) || volumeLitres <= 0) {
+    throw new Error(
+      `batherCapacity: volumeLitres must be positive, got ${volumeLitres}`,
+    );
+  }
+  const litresPerGallon = opts.litresPerGallon ?? LITRES_PER_US_GALLON;
+  const divisor = opts.divisor ?? PHTA_DIVISOR;
+  const gallons = volumeLitres / litresPerGallon;
+  return Math.max(1, Math.round(gallons / divisor));
+}
+
+export interface UsageWaterStatus {
+  capacity: number; // total person-soaks before a change
+  used: number; // person-soaks logged since the last drain
+  remaining: number; // person-soaks left (never negative)
+  fractionUsed: number; // 0..1 (clamped)
+  changeDue: boolean; // used >= capacity
+}
+
+// Where the water sits between fresh and "time to change", from real usage.
+export function usageWaterStatus(
+  volumeLitres: number,
+  cumulativeBathers: number,
+  opts: WaterChangeOptions = {},
+): UsageWaterStatus {
+  const capacity = batherCapacity(volumeLitres, opts);
+  const used = Math.max(0, cumulativeBathers);
+  const remaining = Math.max(0, capacity - used);
+  const fractionUsed = capacity > 0 ? Math.min(1, used / capacity) : 1;
+  return { capacity, used, remaining, fractionUsed, changeDue: used >= capacity };
+}
+
 // Whole days elapsed since a timestamp (never negative).
 export function daysSince(iso: string | Date | null, now: Date = new Date()): number | null {
   if (iso === null) return null;

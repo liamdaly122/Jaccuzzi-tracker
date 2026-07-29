@@ -5,10 +5,14 @@ import {
   toSpaConfig,
   getTasks,
   getLatestReading,
+  getRecentReadings,
+  getBathersSince,
   toTaskLike,
 } from "@/lib/data";
 import { computeNextDue } from "@/lib/tasks";
 import { calculateRecommendations } from "@/lib/chemistry";
+import { buildForecasts } from "@/lib/predict";
+import { usageWaterStatus } from "@/lib/water";
 import { sendNtfy } from "@/lib/ntfy";
 
 export const runtime = "nodejs";
@@ -31,9 +35,12 @@ async function handle(request: NextRequest) {
 
   let dueTasks: string[] = [];
   let chemAlerts: string[] = [];
+  let forecastAlerts: string[] = [];
+  let usageAlert: string | null = null;
   let hasDanger = false;
 
   try {
+    const config = toSpaConfig(await getSettings());
     const tasks = await getTasks();
     dueTasks = tasks
       .map((t) => ({ name: t.name, info: computeNextDue(toTaskLike(t), now) }))
@@ -44,9 +51,9 @@ async function handle(request: NextRequest) {
           : `${t.name} (due)`,
       );
 
+    // Latest-reading safety alerts.
     const latest = await getLatestReading();
     if (latest) {
-      const config = toSpaConfig(await getSettings());
       const calc = calculateRecommendations(
         {
           ph: Number(latest.ph),
@@ -73,6 +80,24 @@ async function handle(request: NextRequest) {
         }
       }
     }
+
+    // Predictive early-warnings from the reading history.
+    const recent = await getRecentReadings(30);
+    forecastAlerts = buildForecasts(recent, config).map(
+      (f) =>
+        `${f.metric} ${f.direction === "falling" ? "low" : "high"} in ~${f.daysUntil}d`,
+    );
+
+    // Usage-based "time to change the water" (only if the usage table exists).
+    try {
+      const drainTask = tasks.find((t) => t.task_key === "drain_refill");
+      const cumulative = await getBathersSince(drainTask?.last_completed_at ?? null);
+      if (usageWaterStatus(config.volumeLitres, cumulative).changeDue) {
+        usageAlert = "Water likely ready to change (based on how much it's been used)";
+      }
+    } catch {
+      // usage_log table not set up yet — skip silently.
+    }
   } catch (err) {
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Cron failed" },
@@ -83,6 +108,8 @@ async function handle(request: NextRequest) {
   const parts: string[] = [];
   if (dueTasks.length) parts.push(`Due: ${dueTasks.join(", ")}`);
   if (chemAlerts.length) parts.push(`Water: ${chemAlerts.join(" ")}`);
+  if (forecastAlerts.length) parts.push(`Forecast: ${forecastAlerts.join(", ")}`);
+  if (usageAlert) parts.push(usageAlert);
   const summary = parts.join(" · ");
 
   // Idempotent per-day guard + the daily DB write that prevents auto-pause.
@@ -112,6 +139,8 @@ async function handle(request: NextRequest) {
     notified,
     dueTasks,
     chemAlerts,
+    forecastAlerts,
+    usageAlert,
   });
 }
 

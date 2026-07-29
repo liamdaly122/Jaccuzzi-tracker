@@ -132,6 +132,19 @@ create index if not exists task_completions_task_id_idx
   on task_completions (task_id, completed_at desc);
 
 -- -----------------------------------------------------------------------------
+-- usage_log: each time the tub is used (a "soak"), with how many people. Feeds
+-- the smart water-change tracker with your ACTUAL usage.
+-- -----------------------------------------------------------------------------
+create table if not exists usage_log (
+  id bigint generated always as identity primary key,
+  used_at timestamptz not null default now(),
+  bathers integer not null check (bathers > 0),
+  note text,
+  created_at timestamptz not null default now()
+);
+create index if not exists usage_log_used_at_idx on usage_log (used_at desc);
+
+-- -----------------------------------------------------------------------------
 -- notification_log: one row per day the scheduler runs. The unique constraint
 -- both prevents duplicate same-day push notifications AND guarantees at least
 -- one database write per day (which stops Supabase's free tier from pausing

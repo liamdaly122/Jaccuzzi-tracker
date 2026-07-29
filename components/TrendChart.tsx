@@ -17,6 +17,7 @@ interface Props {
   idealMax: number;
   unit?: string;
   decimals?: number;
+  note?: string; // small caption, e.g. a trend direction
 }
 
 // Ink / surface tokens (light mode) — text never wears the series colour.
@@ -36,6 +37,7 @@ export default function TrendChart({
   idealMax,
   unit = "",
   decimals = 1,
+  note,
 }: Props) {
   const data = points.filter(
     (p): p is { date: string; value: number } => p.value !== null,
@@ -91,6 +93,7 @@ export default function TrendChart({
           {unit ? ` ${unit}` : ""}
         </span>
       </div>
+      {note ? <p className="mb-1 text-xs text-slate-500">{note}</p> : null}
       <svg
         viewBox={`0 0 ${W} ${H}`}
         className="w-full"
