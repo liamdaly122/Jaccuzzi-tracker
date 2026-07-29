@@ -17,10 +17,13 @@ import type { SanitizerType } from "./chemistry";
 import type { RawScan } from "./scan";
 
 // The model is read from an env var so it can be changed in Vercel WITHOUT a
-// code change — Google keeps shifting which models have free-tier quota. As of
-// 2026 the current Flash generation still has a free tier WITH image input
-// (older `gemini-2.0-flash` now returns 429 "limit 0" — no free quota).
-const MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash";
+// code change. We default to the `gemini-flash-latest` ALIAS rather than a
+// pinned version on purpose: Google keeps retiring specific Flash versions for
+// new users (gemini-2.0-flash → 429 "limit 0"; gemini-2.5-flash → 404 "no
+// longer available to new users"). The alias always tracks the current stable
+// Flash model (multimodal, image input, free tier), so it survives those
+// deprecations automatically.
+const MODEL = process.env.GEMINI_MODEL || "gemini-flash-latest";
 const ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`;
 const TIMEOUT_MS = 20000;
 

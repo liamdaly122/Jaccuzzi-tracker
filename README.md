@@ -197,11 +197,13 @@ saving** — especially your sanitizer — because the camera can misread colour
 Left the key out? The button simply doesn't appear and you type readings in as
 normal.
 
-> **If the scan says the free model "has no quota":** Google occasionally retires
-> which AI model is free. It's an easy fix and still needs **no card** — just
-> tell me and I'll point the app at the current free model. (Advanced: you can
-> also set an optional `GEMINI_MODEL` env var in Vercel, e.g.
-> `gemini-2.5-flash-lite`, and redeploy.)
+> **If the scan ever says the model has no quota or is unavailable:** Google
+> occasionally retires older AI models. The app defaults to the
+> `gemini-flash-latest` alias, which tracks whichever Flash model is current, so
+> this should keep working — but if it ever breaks, it's an easy fix that still
+> needs **no card**: just tell me and I'll point it at the current free model.
+> (Advanced: you can also pin a specific model with an optional `GEMINI_MODEL`
+> env var in Vercel, e.g. `gemini-flash-lite-latest`, and redeploy.)
 
 ---
 
