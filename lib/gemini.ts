@@ -16,7 +16,11 @@ import "server-only";
 import type { SanitizerType } from "./chemistry";
 import type { RawScan } from "./scan";
 
-const MODEL = "gemini-2.0-flash";
+// The model is read from an env var so it can be changed in Vercel WITHOUT a
+// code change — Google keeps shifting which models have free-tier quota. As of
+// 2026 the current Flash generation still has a free tier WITH image input
+// (older `gemini-2.0-flash` now returns 429 "limit 0" — no free quota).
+const MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash";
 const ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`;
 const TIMEOUT_MS = 20000;
 
@@ -98,12 +102,49 @@ export async function readTestStrip(
     });
 
     if (!res.ok) {
-      // 429 = free-tier rate limit; give a friendlier hint for that case.
-      const hint =
-        res.status === 429
-          ? "The free scanning quota is used up for now — try again in a minute, or type the values in."
-          : "The photo reader is unavailable right now — please type the values in.";
-      return { ok: false, error: hint };
+      // Read Google's actual error so we're not guessing. Log the full detail to
+      // the server (visible in Vercel logs) and surface an honest message.
+      const rawBody = await res.text().catch(() => "");
+      let googleMessage = "";
+      try {
+        googleMessage = JSON.parse(rawBody)?.error?.message ?? "";
+      } catch {
+        googleMessage = rawBody.slice(0, 300);
+      }
+      console.error(
+        `[gemini] ${res.status} for model "${MODEL}": ${googleMessage || rawBody.slice(0, 300)}`,
+      );
+
+      // A 429 that says the limit is 0 (or mentions the free tier) isn't "you
+      // used it all up" — it means this model has no free quota. Point the user
+      // at the model switch, NOT at enabling billing (that needs a card).
+      const looksLikeNoFreeQuota =
+        res.status === 429 &&
+        /limit[^0-9]*0|free[_ ]?tier|quota/i.test(googleMessage);
+
+      if (looksLikeNoFreeQuota) {
+        return {
+          ok: false,
+          error:
+            `Google's free "${MODEL}" model has no free quota right now. ` +
+            "This usually means the free model changed — tell whoever set this up " +
+            "to switch the GEMINI_MODEL, or just type the values in.",
+        };
+      }
+      if (res.status === 429) {
+        return {
+          ok: false,
+          error:
+            "Too many photo scans in a short time — wait a minute and try again, or type the values in.",
+        };
+      }
+      return {
+        ok: false,
+        error:
+          `The photo reader is unavailable right now (${res.status})` +
+          (googleMessage ? `: ${googleMessage.slice(0, 140)}` : "") +
+          ". Please type the values in.",
+      };
     }
 
     const data = await res.json();

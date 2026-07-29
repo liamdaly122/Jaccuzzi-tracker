@@ -197,6 +197,12 @@ saving** — especially your sanitizer — because the camera can misread colour
 Left the key out? The button simply doesn't appear and you type readings in as
 normal.
 
+> **If the scan says the free model "has no quota":** Google occasionally retires
+> which AI model is free. It's an easy fix and still needs **no card** — just
+> tell me and I'll point the app at the current free model. (Advanced: you can
+> also set an optional `GEMINI_MODEL` env var in Vercel, e.g.
+> `gemini-2.5-flash-lite`, and redeploy.)
+
 ---
 
 ## Turn on weather warnings 🌦️ (no setup, no key)
