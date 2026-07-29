@@ -9,12 +9,15 @@ export const taskTypeIcons: Record<TaskType, string> = {
   cleaning: "🧼",
 };
 
-export const taskTypeColors: Record<TaskType, string> = {
-  testing: "bg-brand-500",
-  sanitizing: "bg-emerald-500",
-  filter: "bg-violet-500",
-  water: "bg-sky-500",
-  cleaning: "bg-amber-500",
+// Hex colours (not Tailwind classes) so the dots always render — Tailwind only
+// scans app/ and components/, so colour classes defined here would get purged.
+// Five clearly-distinct, easy-to-spot hues.
+export const taskTypeHex: Record<TaskType, string> = {
+  testing: "#2563eb", // blue
+  sanitizing: "#16a34a", // green
+  filter: "#9333ea", // purple
+  water: "#dc2626", // red
+  cleaning: "#f97316", // orange
 };
 
 export function dueStatusLabel(status: DueStatus, daysUntilDue: number): string {
