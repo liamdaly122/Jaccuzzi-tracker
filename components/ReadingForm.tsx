@@ -39,18 +39,53 @@ export default function ReadingForm({
   const num = (s: string): number | null =>
     s.trim() === "" ? null : Number(s);
 
-  // Read a File as raw base64 (drops the "data:...;base64," prefix).
-  function fileToBase64(file: File): Promise<string> {
+  const rawBase64 = (dataUrl: string): string => {
+    const comma = dataUrl.indexOf(",");
+    return comma >= 0 ? dataUrl.slice(comma + 1) : dataUrl;
+  };
+
+  function readAsDataUrl(file: File): Promise<string> {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
-      reader.onload = () => {
-        const out = reader.result as string;
-        const comma = out.indexOf(",");
-        resolve(comma >= 0 ? out.slice(comma + 1) : out);
-      };
+      reader.onload = () => resolve(reader.result as string);
       reader.onerror = () => reject(reader.error);
       reader.readAsDataURL(file);
     });
+  }
+
+  // Shrink the photo in the browser before uploading. A test strip doesn't need
+  // full phone resolution, and a smaller JPEG uploads and gets read MUCH faster
+  // (this is what was causing the reader to time out). Falls back to the raw file
+  // if the canvas path isn't available. Returns raw base64 + its mime type.
+  async function fileToScaledJpeg(
+    file: File,
+  ): Promise<{ base64: string; mimeType: string }> {
+    const dataUrl = await readAsDataUrl(file);
+    try {
+      const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+        const i = new Image();
+        i.onload = () => resolve(i);
+        i.onerror = () => reject(new Error("decode failed"));
+        i.src = dataUrl;
+      });
+      const MAX = 1280; // px on the long edge — plenty to read colour pads
+      const scale = Math.min(1, MAX / Math.max(img.width, img.height));
+      const w = Math.max(1, Math.round(img.width * scale));
+      const h = Math.max(1, Math.round(img.height * scale));
+      const canvas = document.createElement("canvas");
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) throw new Error("no 2d context");
+      ctx.drawImage(img, 0, 0, w, h);
+      return {
+        base64: rawBase64(canvas.toDataURL("image/jpeg", 0.85)),
+        mimeType: "image/jpeg",
+      };
+    } catch {
+      // Couldn't downscale (e.g. HEIC decode) — send the original as-is.
+      return { base64: rawBase64(dataUrl), mimeType: file.type };
+    }
   }
 
   async function onScanFile(e: React.ChangeEvent<HTMLInputElement>) {
@@ -62,11 +97,11 @@ export default function ReadingForm({
     setScanError(null);
     setScanFilled(false);
     try {
-      const imageBase64 = await fileToBase64(file);
+      const { base64: imageBase64, mimeType } = await fileToScaledJpeg(file);
       const res = await fetch("/api/scan-strip", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ imageBase64, mimeType: file.type }),
+        body: JSON.stringify({ imageBase64, mimeType }),
       });
       const data = await res.json();
       if (res.ok && data.values) {

@@ -25,7 +25,7 @@ import type { RawScan } from "./scan";
 // deprecations automatically.
 const MODEL = process.env.GEMINI_MODEL || "gemini-flash-latest";
 const ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`;
-const TIMEOUT_MS = 20000;
+const TIMEOUT_MS = 50000; // stays under the route's 60s maxDuration
 
 export type ReadStripResult =
   | { ok: true; values: RawScan }

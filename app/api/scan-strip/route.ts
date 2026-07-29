@@ -5,6 +5,9 @@ import { normalizeScan } from "@/lib/scan";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+// Reading a photo can take a little while — allow the full Vercel Hobby ceiling
+// so the request isn't killed early (the reader itself times out at 50s).
+export const maxDuration = 60;
 
 // Roughly 8 MB of base64 (~6 MB image) — enough for a phone photo, small enough
 // to reject anything abusive before we forward it to Gemini.
