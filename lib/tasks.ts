@@ -82,6 +82,27 @@ export function computeNextDue(
   return { nextDueAt, daysUntilDue, status };
 }
 
+export interface TaskLife {
+  fractionRemaining: number; // 1 = just done, 0 = due now / overdue
+  daysUntilDue: number; // negative = overdue
+  status: DueStatus;
+  nextDueAt: Date;
+}
+
+// "Life remaining" for a recurring task, like a robot-vacuum consumable bar:
+// full right after it's done, emptying smoothly to 0 by its due date. Used to
+// draw a countdown progress bar per maintenance item.
+export function computeTaskLife(
+  task: TaskLike,
+  now: Date = new Date(),
+): TaskLife {
+  const { nextDueAt, daysUntilDue, status } = computeNextDue(task, now);
+  const cycleMs = task.frequencyDays * 24 * 60 * 60 * 1000;
+  const remainingMs = nextDueAt.getTime() - now.getTime();
+  const fractionRemaining = Math.max(0, Math.min(1, remainingMs / cycleMs));
+  return { fractionRemaining, daysUntilDue, status, nextDueAt };
+}
+
 export interface OccurrenceTemplate {
   taskKey: string;
   name: string;

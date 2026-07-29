@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   computeNextDue,
+  computeTaskLife,
   generateOccurrences,
   type OccurrenceTemplate,
 } from "../lib/tasks";
@@ -80,6 +81,49 @@ describe("computeNextDue", () => {
     expect(() =>
       computeNextDue({ frequencyDays: -5, lastCompletedAt: NOW }, NOW),
     ).toThrow();
+  });
+});
+
+describe("computeTaskLife", () => {
+  it("is full right after completion", () => {
+    const life = computeTaskLife({ frequencyDays: 10, lastCompletedAt: NOW }, NOW);
+    expect(life.fractionRemaining).toBeCloseTo(1, 5);
+    expect(life.status).toBe("ok");
+  });
+
+  it("is half at the midpoint of the cycle", () => {
+    const life = computeTaskLife(
+      { frequencyDays: 10, lastCompletedAt: daysAgo(5) },
+      NOW,
+    );
+    expect(life.fractionRemaining).toBeCloseTo(0.5, 5);
+  });
+
+  it("is empty exactly on the due date", () => {
+    const life = computeTaskLife(
+      { frequencyDays: 10, lastCompletedAt: daysAgo(10) },
+      NOW,
+    );
+    expect(life.fractionRemaining).toBe(0);
+  });
+
+  it("clamps to zero when overdue", () => {
+    const life = computeTaskLife(
+      { frequencyDays: 10, lastCompletedAt: daysAgo(15) },
+      NOW,
+    );
+    expect(life.fractionRemaining).toBe(0);
+    expect(life.status).toBe("overdue");
+    expect(life.daysUntilDue).toBe(-5);
+  });
+
+  it("is empty and overdue when never completed", () => {
+    const life = computeTaskLife(
+      { frequencyDays: 10, lastCompletedAt: null },
+      NOW,
+    );
+    expect(life.fractionRemaining).toBe(0);
+    expect(life.status).toBe("overdue");
   });
 });
 

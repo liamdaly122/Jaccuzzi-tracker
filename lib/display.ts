@@ -20,6 +20,14 @@ export const taskTypeHex: Record<TaskType, string> = {
   cleaning: "#f97316", // orange
 };
 
+// Colour for a task's "life remaining" bar (inline hex, purge-proof):
+// green when there's plenty of life, amber as it runs low, red when overdue.
+export function lifeBarHex(status: DueStatus, fractionRemaining: number): string {
+  if (status === "overdue") return "#dc2626"; // red
+  if (status === "due_soon" || fractionRemaining <= 0.25) return "#f59e0b"; // amber
+  return "#16a34a"; // green
+}
+
 export function dueStatusLabel(status: DueStatus, daysUntilDue: number): string {
   if (status === "overdue") {
     const late = Math.abs(daysUntilDue);
