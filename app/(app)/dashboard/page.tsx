@@ -2,18 +2,22 @@ import Link from "next/link";
 import SetupNeeded from "@/components/SetupNeeded";
 import CompleteButton from "@/components/CompleteButton";
 import ApplyIntervalButton from "@/components/ApplyIntervalButton";
+import LogSoakButton from "@/components/LogSoakButton";
 import { Badge, Card, LinkButton } from "@/components/ui";
 import {
   getSettings,
   toSpaConfig,
   getTasks,
   getLatestReading,
+  getRecentReadings,
   getLastNotification,
+  getBathersSince,
   toTaskLike,
 } from "@/lib/data";
 import { computeNextDue } from "@/lib/tasks";
 import { calculateRecommendations } from "@/lib/chemistry";
-import { computeWaterChangeIntervalDays, daysSince } from "@/lib/water";
+import { computeWaterChangeIntervalDays, daysSince, usageWaterStatus } from "@/lib/water";
+import { buildForecasts } from "@/lib/predict";
 import {
   dueStatusLabel,
   dueStatusTone,
@@ -24,12 +28,13 @@ import {
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
-  let settings, tasks, latest, lastNotification;
+  let settings, tasks, latest, recentReadings, lastNotification;
   try {
-    [settings, tasks, latest, lastNotification] = await Promise.all([
+    [settings, tasks, latest, recentReadings, lastNotification] = await Promise.all([
       getSettings(),
       getTasks(),
       getLatestReading(),
+      getRecentReadings(30),
       getLastNotification(),
     ]);
   } catch (err) {
@@ -41,7 +46,7 @@ export default async function DashboardPage() {
   const now = new Date();
   const config = toSpaConfig(settings);
 
-  // Compute the latest reading's status for the top banner.
+  // Latest reading's safety status for the top banner.
   let calc = null;
   if (latest) {
     calc = calculateRecommendations(
@@ -61,6 +66,9 @@ export default async function DashboardPage() {
     );
   }
 
+  // Predictive early-warnings from the reading history.
+  const forecasts = buildForecasts(recentReadings, config);
+
   const dueTasks = tasks
     .map((t) => ({ row: t, info: computeNextDue(toTaskLike(t), now) }))
     .filter((t) => t.info.status !== "ok")
@@ -68,23 +76,32 @@ export default async function DashboardPage() {
 
   const hasDanger = calc?.safetyFlags.some((f) => f.severity === "danger");
 
-  // Smart water-change: recommend a drain interval from tub size + typical use.
+  // Smart water-change: time-based estimate from tub size + typical use.
   const drainTask = tasks.find((t) => t.task_key === "drain_refill");
   const bathers = Number(settings.avg_daily_bathers ?? 1.5);
   const waterChange = computeWaterChangeIntervalDays(config.volumeLitres, bathers);
   const waterAgeDays = drainTask
     ? daysSince(drainTask.last_completed_at, now)
     : null;
-  const scheduleMatches =
-    drainTask?.frequency_days === waterChange.intervalDays;
+  const scheduleMatches = drainTask?.frequency_days === waterChange.intervalDays;
+
+  // Usage-based water freshness (only if the usage table has been set up).
+  let cumulativeBathers: number | null = null;
+  try {
+    cumulativeBathers = await getBathersSince(drainTask?.last_completed_at ?? null);
+  } catch {
+    cumulativeBathers = null;
+  }
+  const usageAvailable = cumulativeBathers !== null;
+  const usageStatus = usageAvailable
+    ? usageWaterStatus(config.volumeLitres, cumulativeBathers as number)
+    : null;
 
   return (
     <div className="space-y-4">
       <div>
         <h1 className="text-2xl font-bold text-slate-800">Today</h1>
-        <p className="text-sm text-slate-500">
-          Your hot tub at a glance.
-        </p>
+        <p className="text-sm text-slate-500">Your hot tub at a glance.</p>
       </div>
 
       {hasDanger ? (
@@ -96,6 +113,23 @@ export default async function DashboardPage() {
             ))}
           </ul>
         </div>
+      ) : null}
+
+      {/* Predictive heads-up */}
+      {forecasts.length > 0 ? (
+        <Card className="border-amber-200 bg-amber-50">
+          <h2 className="mb-2 font-semibold text-amber-900">🔮 Heads-up</h2>
+          <ul className="space-y-2">
+            {forecasts.map((f) => (
+              <li key={f.key} className="text-sm text-amber-900">
+                <span className="mr-1">
+                  {f.severity === "warning" ? "⚠️" : "•"}
+                </span>
+                {f.message}
+              </li>
+            ))}
+          </ul>
+        </Card>
       ) : null}
 
       {/* Water status */}
@@ -146,17 +180,44 @@ export default async function DashboardPage() {
       {/* Water freshness (smart drain & refill) */}
       <Card>
         <h2 className="mb-1 font-semibold text-slate-800">Water freshness</h2>
-        <p className="text-sm text-slate-600">
-          {waterAgeDays === null
-            ? "Log a drain & refill to start tracking how fresh your water is."
-            : `Your water is about ${waterAgeDays} day${waterAgeDays === 1 ? "" : "s"} old.`}
-        </p>
-        <p className="mt-2 text-sm text-slate-600">
+
+        {usageStatus ? (
+          <div className="mb-3">
+            <div className="mb-1 flex justify-between text-sm text-slate-600">
+              <span>
+                {usageStatus.used} of ~{usageStatus.capacity} person-soaks used
+              </span>
+              <span>{Math.round(usageStatus.fractionUsed * 100)}%</span>
+            </div>
+            <div className="h-2.5 overflow-hidden rounded-full bg-slate-100">
+              <div
+                className={`h-full rounded-full ${
+                  usageStatus.changeDue ? "bg-red-500" : "bg-brand-500"
+                }`}
+                style={{ width: `${Math.round(usageStatus.fractionUsed * 100)}%` }}
+              />
+            </div>
+            <p className="mt-2 text-sm text-slate-600">
+              {usageStatus.changeDue
+                ? "🚿 Based on how much it's been used, it's time to drain & refill."
+                : `About ${usageStatus.remaining} more person-soaks before a change is due.`}
+            </p>
+          </div>
+        ) : (
+          <p className="text-sm text-slate-600">
+            {waterAgeDays === null
+              ? "Log a drain & refill to start tracking how fresh your water is."
+              : `Your water is about ${waterAgeDays} day${waterAgeDays === 1 ? "" : "s"} old.`}
+          </p>
+        )}
+
+        <p className="mt-1 text-sm text-slate-600">
           Based on ~{bathers} {bathers === 1 ? "person" : "people"} a day, aim to
           drain &amp; refill roughly every{" "}
           <strong>{waterChange.intervalDays} days</strong>
           {waterChange.cappedByMax ? " (light use — quarterly is plenty)" : ""}.
         </p>
+
         {drainTask && !scheduleMatches ? (
           <ApplyIntervalButton
             taskId={drainTask.id}
@@ -167,6 +228,13 @@ export default async function DashboardPage() {
             ✓ Your drain &amp; refill schedule matches this.
           </p>
         ) : null}
+
+        {usageAvailable ? (
+          <div className="mt-3">
+            <LogSoakButton />
+          </div>
+        ) : null}
+
         <p className="mt-2 text-xs text-slate-400">
           Change how many people use it in Settings.
         </p>
@@ -194,9 +262,7 @@ export default async function DashboardPage() {
                 <div className="flex items-center gap-3">
                   <span className="text-xl">{taskTypeIcons[row.task_type]}</span>
                   <div>
-                    <p className="text-sm font-medium text-slate-800">
-                      {row.name}
-                    </p>
+                    <p className="text-sm font-medium text-slate-800">{row.name}</p>
                     <Badge tone={dueStatusTone(info.status)}>
                       {dueStatusLabel(info.status, info.daysUntilDue)}
                     </Badge>
@@ -207,6 +273,17 @@ export default async function DashboardPage() {
             ))}
           </ul>
         )}
+      </Card>
+
+      {/* Guides & help */}
+      <Card>
+        <Link
+          href="/guides"
+          className="flex items-center justify-between font-medium text-slate-700"
+        >
+          <span>📋 Guides &amp; help (routines + what chemicals do)</span>
+          <span className="text-brand-600">→</span>
+        </Link>
       </Card>
 
       <p className="text-center text-xs text-slate-400">

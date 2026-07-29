@@ -2,6 +2,8 @@ import { describe, it, expect } from "vitest";
 import {
   computeWaterChangeIntervalDays,
   daysSince,
+  batherCapacity,
+  usageWaterStatus,
   LITRES_PER_US_GALLON,
   MAX_RECOMMENDED_INTERVAL_DAYS,
 } from "../lib/water";
@@ -41,6 +43,45 @@ describe("computeWaterChangeIntervalDays", () => {
   it("throws on a non-positive volume", () => {
     expect(() => computeWaterChangeIntervalDays(0, 2)).toThrow();
     expect(() => computeWaterChangeIntervalDays(-100, 2)).toThrow();
+  });
+});
+
+describe("batherCapacity", () => {
+  it("is gallons / 3 (person-soaks before a change)", () => {
+    // 1050 L ~= 277 US gal; /3 ~= 92 person-soaks
+    expect(batherCapacity(1050)).toBe(92);
+    // 400 US gal -> ~133
+    expect(batherCapacity(400 * LITRES_PER_US_GALLON)).toBe(133);
+  });
+
+  it("throws on a non-positive volume", () => {
+    expect(() => batherCapacity(0)).toThrow();
+  });
+});
+
+describe("usageWaterStatus", () => {
+  it("reports fresh water at zero usage", () => {
+    const s = usageWaterStatus(1050, 0);
+    expect(s.capacity).toBe(92);
+    expect(s.used).toBe(0);
+    expect(s.remaining).toBe(92);
+    expect(s.fractionUsed).toBe(0);
+    expect(s.changeDue).toBe(false);
+  });
+
+  it("reports halfway through", () => {
+    const s = usageWaterStatus(1050, 46);
+    expect(s.remaining).toBe(46);
+    expect(s.fractionUsed).toBeCloseTo(0.5, 2);
+    expect(s.changeDue).toBe(false);
+  });
+
+  it("flags a change as due at/over capacity, clamped", () => {
+    expect(usageWaterStatus(1050, 92).changeDue).toBe(true);
+    const over = usageWaterStatus(1050, 200);
+    expect(over.changeDue).toBe(true);
+    expect(over.remaining).toBe(0);
+    expect(over.fractionUsed).toBe(1);
   });
 });
 

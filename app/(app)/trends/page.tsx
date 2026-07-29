@@ -3,8 +3,20 @@ import SetupNeeded from "@/components/SetupNeeded";
 import TrendChart, { type TrendPoint } from "@/components/TrendChart";
 import { Card } from "@/components/ui";
 import { getRecentReadings, getSettings, toSpaConfig } from "@/lib/data";
+import { linearTrend } from "@/lib/predict";
 
 export const dynamic = "force-dynamic";
+
+// A short human caption for a metric's recent direction.
+function trendNote(points: TrendPoint[], decimals: number, unit: string): string {
+  const trend = linearTrend(points);
+  if (!trend) return "Not enough data for a trend yet.";
+  const rate = Math.abs(trend.slopePerDay);
+  const u = unit ? ` ${unit}` : "";
+  if (rate < (unit === "ppm" ? 0.05 : 0.02)) return "→ Holding steady.";
+  const arrow = trend.slopePerDay < 0 ? "↓ Falling" : "↑ Rising";
+  return `${arrow} ~${rate.toFixed(decimals === 0 ? 1 : decimals)}${u}/day.`;
+}
 
 export default async function TrendsPage() {
   let readings, settings;
@@ -69,6 +81,7 @@ export default async function TrendsPage() {
             idealMin={config.targetRanges.phIdealMin}
             idealMax={config.targetRanges.phIdealMax}
             decimals={1}
+            note={trendNote(phPoints, 1, "")}
           />
           <TrendChart
             title="Total alkalinity"
@@ -77,6 +90,7 @@ export default async function TrendsPage() {
             idealMax={config.targetRanges.taMax}
             unit="ppm"
             decimals={0}
+            note={trendNote(taPoints, 0, "ppm")}
           />
           <TrendChart
             title={isChlorine ? "Free chlorine" : "Bromine"}
@@ -85,6 +99,7 @@ export default async function TrendsPage() {
             idealMax={isChlorine ? config.targetRanges.fcMax : config.targetRanges.brMax}
             unit="ppm"
             decimals={1}
+            note={trendNote(sanitizerPoints, 1, "ppm")}
           />
         </div>
       )}
