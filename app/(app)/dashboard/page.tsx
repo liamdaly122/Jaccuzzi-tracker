@@ -1,6 +1,7 @@
 import Link from "next/link";
 import SetupNeeded from "@/components/SetupNeeded";
 import CompleteButton from "@/components/CompleteButton";
+import ApplyIntervalButton from "@/components/ApplyIntervalButton";
 import { Badge, Card, LinkButton } from "@/components/ui";
 import {
   getSettings,
@@ -12,6 +13,7 @@ import {
 } from "@/lib/data";
 import { computeNextDue } from "@/lib/tasks";
 import { calculateRecommendations } from "@/lib/chemistry";
+import { computeWaterChangeIntervalDays, daysSince } from "@/lib/water";
 import {
   dueStatusLabel,
   dueStatusTone,
@@ -66,6 +68,16 @@ export default async function DashboardPage() {
 
   const hasDanger = calc?.safetyFlags.some((f) => f.severity === "danger");
 
+  // Smart water-change: recommend a drain interval from tub size + typical use.
+  const drainTask = tasks.find((t) => t.task_key === "drain_refill");
+  const bathers = Number(settings.avg_daily_bathers ?? 1.5);
+  const waterChange = computeWaterChangeIntervalDays(config.volumeLitres, bathers);
+  const waterAgeDays = drainTask
+    ? daysSince(drainTask.last_completed_at, now)
+    : null;
+  const scheduleMatches =
+    drainTask?.frequency_days === waterChange.intervalDays;
+
   return (
     <div className="space-y-4">
       <div>
@@ -118,11 +130,46 @@ export default async function DashboardPage() {
             No readings yet. Test your water to get started.
           </p>
         )}
-        <div className="mt-4">
+        <div className="mt-4 space-y-2">
           <LinkButton href="/readings/new" className="w-full">
             🧪 Test the water now
           </LinkButton>
+          <Link
+            href="/trends"
+            className="block text-center text-sm font-medium text-brand-600"
+          >
+            📈 View trends
+          </Link>
         </div>
+      </Card>
+
+      {/* Water freshness (smart drain & refill) */}
+      <Card>
+        <h2 className="mb-1 font-semibold text-slate-800">Water freshness</h2>
+        <p className="text-sm text-slate-600">
+          {waterAgeDays === null
+            ? "Log a drain & refill to start tracking how fresh your water is."
+            : `Your water is about ${waterAgeDays} day${waterAgeDays === 1 ? "" : "s"} old.`}
+        </p>
+        <p className="mt-2 text-sm text-slate-600">
+          Based on ~{bathers} {bathers === 1 ? "person" : "people"} a day, aim to
+          drain &amp; refill roughly every{" "}
+          <strong>{waterChange.intervalDays} days</strong>
+          {waterChange.cappedByMax ? " (light use — quarterly is plenty)" : ""}.
+        </p>
+        {drainTask && !scheduleMatches ? (
+          <ApplyIntervalButton
+            taskId={drainTask.id}
+            intervalDays={waterChange.intervalDays}
+          />
+        ) : drainTask && scheduleMatches ? (
+          <p className="mt-2 text-xs text-emerald-700">
+            ✓ Your drain &amp; refill schedule matches this.
+          </p>
+        ) : null}
+        <p className="mt-2 text-xs text-slate-400">
+          Change how many people use it in Settings.
+        </p>
       </Card>
 
       {/* Coming up */}

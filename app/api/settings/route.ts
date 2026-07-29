@@ -33,6 +33,7 @@ export async function PUT(request: NextRequest) {
     .update({
       sanitizer_type: parsed.data.sanitizerType,
       volume_litres: parsed.data.volumeLitres,
+      avg_daily_bathers: parsed.data.avgDailyBathers,
       target_ranges: parsed.data.targetRanges,
       dosing_constants: parsed.data.dosingConstants,
       updated_at: new Date().toISOString(),

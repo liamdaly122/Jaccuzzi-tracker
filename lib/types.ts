@@ -19,6 +19,7 @@ export interface SpaSettings {
   volume_litres: number;
   target_ranges: TargetRanges;
   dosing_constants: DosingConstants;
+  avg_daily_bathers: number;
   updated_at: string;
 }
 

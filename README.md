@@ -178,12 +178,19 @@ the ntfy notifications are your reliable reminder.
   app instantly tells you what to add, **in the right order** (alkalinity → pH →
   sanitizer → shock) and **how many grams**. Tap **"Log this as added"** to keep
   a record.
-- **Today screen:** shows your latest water status and anything that's due.
+- **Today screen:** shows your latest water status, anything that's due, and a
+  **Water freshness** card that works out how often to drain & refill based on
+  your tub size and how many people use it (one tap applies it to your
+  schedule).
+- **Trends (📈 on the Today screen):** line graphs of your pH, alkalinity and
+  sanitizer over time, so you can spot the water drifting before it's a problem.
 - **Tasks:** tick off jobs like rinsing the filter. The next due date updates
   itself. You can change how often each task repeats.
-- **Calendar:** see the month ahead at a glance.
-- **Settings:** switch between chlorine/bromine, set your water volume, and
-  fine-tune targets if your product label differs.
+- **Calendar:** tap any day to see what's scheduled, browse months, and see an
+  "upcoming" list of what's next.
+- **Settings:** switch between chlorine/bromine, set your water volume and how
+  many people use it on an average day, and fine-tune targets if your product
+  label differs.
 
 ---
 
