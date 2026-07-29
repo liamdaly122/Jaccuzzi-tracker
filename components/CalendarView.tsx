@@ -17,7 +17,7 @@ import {
   isSameDay,
 } from "date-fns";
 import { generateOccurrences, type Occurrence } from "@/lib/tasks";
-import { taskTypeColors, taskTypeIcons } from "@/lib/display";
+import { taskTypeHex, taskTypeIcons } from "@/lib/display";
 import { Badge, Card } from "./ui";
 import CompleteButton from "./CompleteButton";
 
@@ -26,7 +26,7 @@ export interface CalendarTask {
   id: number;
   taskKey: string;
   name: string;
-  taskType: keyof typeof taskTypeColors;
+  taskType: keyof typeof taskTypeHex;
   frequencyDays: number;
   lastCompletedAt: string | null;
 }
@@ -175,7 +175,8 @@ export default function CalendarView({ tasks }: { tasks: CalendarTask[] }) {
                   {occ.map((o, i) => (
                     <span
                       key={`${o.taskKey}-${i}`}
-                      className={`h-2 w-2 rounded-full ${taskTypeColors[o.taskType]}`}
+                      className="h-2 w-2 rounded-full"
+                      style={{ backgroundColor: taskTypeHex[o.taskType] }}
                     />
                   ))}
                 </div>
@@ -237,7 +238,8 @@ export default function CalendarView({ tasks }: { tasks: CalendarTask[] }) {
                 >
                   <span className="flex items-center gap-2">
                     <span
-                      className={`h-2.5 w-2.5 rounded-full ${taskTypeColors[o.taskType]}`}
+                      className="h-2.5 w-2.5 rounded-full"
+                      style={{ backgroundColor: taskTypeHex[o.taskType] }}
                     />
                     <span className="text-sm text-slate-700">{o.name}</span>
                   </span>
@@ -262,9 +264,10 @@ export default function CalendarView({ tasks }: { tasks: CalendarTask[] }) {
           {Object.entries(taskTypeIcons).map(([type, icon]) => (
             <div key={type} className="flex items-center gap-2">
               <span
-                className={`h-2.5 w-2.5 rounded-full ${
-                  taskTypeColors[type as keyof typeof taskTypeColors]
-                }`}
+                className="h-2.5 w-2.5 rounded-full"
+                style={{
+                  backgroundColor: taskTypeHex[type as keyof typeof taskTypeHex],
+                }}
               />
               <span className="text-slate-600">
                 {icon} {type}
