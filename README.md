@@ -52,6 +52,7 @@ what's coming:
 | 4 | `SUPABASE_SERVICE_ROLE_KEY` | **Copy** from Supabase (Step A6). |
 | 5 | `NTFY_TOPIC` | **You invent it.** A private channel name, e.g. `hottub-x7f9q2`. Treat it like a password. |
 | 6 | `ICS_FEED_TOKEN` | **You invent it.** Another keyboard mash, e.g. `k3m8p1w5t9`. Protects your calendar link. |
+| 7 | `GEMINI_API_KEY` | **Optional.** Only for the 📷 photo-scan button. **Copy** a free key from Google AI Studio (see Part E). Skip it and the button just won't show. |
 
 Keep a note of #1 (`APP_PASSCODE`) and #5 (`NTFY_TOPIC`) — you'll need them on
 your phone. The rest you can forget after setup.
@@ -110,6 +111,8 @@ Leave this tab open; you'll copy from it in a moment.
    - `SUPABASE_SERVICE_ROLE_KEY` = *(paste from Supabase)*
    - `NTFY_TOPIC` = *(your invented channel name)*
    - `ICS_FEED_TOKEN` = *(your invented random string)*
+   - `GEMINI_API_KEY` = *(optional — only if you want the photo-scan button; see
+     Part E. You can always add it later.)*
 7. Click **Deploy** and wait a minute or two. When it's done you'll get a web
    address like `https://jaccuzzi-tracker-xxxx.vercel.app`. **That's your app!**
    Open it, enter your `APP_PASSCODE`, and you're in.
@@ -172,6 +175,40 @@ the ntfy notifications are your reliable reminder.
 
 ---
 
+## Part E — (Optional) Turn on 📷 photo-scan of the test strip
+
+This lets you **take a photo of your test strip** and have the app fill in the
+readings for you (you still check them before saving). It uses Google's free
+Gemini AI. No card, no cost — there's a generous free daily limit.
+
+1. Go to **https://aistudio.google.com/apikey** and sign in with your Google
+   account.
+2. Click **Create API key** → **Create API key in new project** (accept any
+   terms). A long key appears — click **Copy**.
+3. Go to your **Vercel** project → **Settings → Environment Variables**.
+4. Add one more: Name `GEMINI_API_KEY`, Value = *(paste the key)*, then **Save**.
+5. Vercel → **Deployments** → open the latest → **⋯ → Redeploy** so the new key
+   takes effect.
+
+Now, on the **🧪 Test the water** screen you'll see a **"📷 Scan strip with
+camera"** button. Snap the wet strip in good light, wait a moment, and the
+numbers pre-fill. **Always double-check each value against the strip before
+saving** — especially your sanitizer — because the camera can misread colours.
+Left the key out? The button simply doesn't appear and you type readings in as
+normal.
+
+---
+
+## Turn on weather warnings 🌦️ (no setup, no key)
+
+In the app, open **Settings → "Your location (for weather warnings)"** and type
+your town or postcode, then **Save**. The Today screen then shows the next few
+days and warns you about **frost** (protect the pump/pipes) or **hot, sunny
+spells** (your sanitizer burns off faster). Leave it blank to keep weather off.
+This uses a free service with no key needed.
+
+---
+
 ## 🧑‍🔧 How to use it day to day
 
 - **Test the water:** tap **🧪 Test**, dip your strip, type in the numbers. The
@@ -188,9 +225,15 @@ the ntfy notifications are your reliable reminder.
   itself. You can change how often each task repeats.
 - **Calendar:** tap any day to see what's scheduled, browse months, and see an
   "upcoming" list of what's next.
+- **Something wrong? (🔎):** on the Today screen or Guides page, pick what you're
+  seeing — cloudy, foamy, green, smelly, itchy skin — and it lists the likely
+  causes and fixes, putting the ones your latest test points at first.
+- **Calibration (in Settings):** as you log tests and doses, the app quietly
+  learns how *your* tub actually responds and offers a one-tap tweak so future
+  dose suggestions get more accurate.
 - **Settings:** switch between chlorine/bromine, set your water volume and how
-  many people use it on an average day, and fine-tune targets if your product
-  label differs.
+  many people use it on an average day, set your location for weather warnings,
+  and fine-tune targets if your product label differs.
 
 ---
 

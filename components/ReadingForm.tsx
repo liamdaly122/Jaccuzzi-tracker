@@ -9,11 +9,16 @@ import RecommendationList from "./RecommendationList";
 interface Props {
   sanitizerType: SanitizerType;
   targetRanges: TargetRanges;
+  scanEnabled?: boolean;
 }
 
 // A test-strip usually gives colour bands, so we present the ideal band next to
 // each field to help the user read their strip.
-export default function ReadingForm({ sanitizerType, targetRanges }: Props) {
+export default function ReadingForm({
+  sanitizerType,
+  targetRanges,
+  scanEnabled = false,
+}: Props) {
   const router = useRouter();
   const [ph, setPh] = useState("");
   const [ta, setTa] = useState("");
@@ -27,8 +32,74 @@ export default function ReadingForm({ sanitizerType, targetRanges }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
+  const [scanning, setScanning] = useState(false);
+  const [scanError, setScanError] = useState<string | null>(null);
+  const [scanFilled, setScanFilled] = useState(false);
+
   const num = (s: string): number | null =>
     s.trim() === "" ? null : Number(s);
+
+  // Read a File as raw base64 (drops the "data:...;base64," prefix).
+  function fileToBase64(file: File): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const out = reader.result as string;
+        const comma = out.indexOf(",");
+        resolve(comma >= 0 ? out.slice(comma + 1) : out);
+      };
+      reader.onerror = () => reject(reader.error);
+      reader.readAsDataURL(file);
+    });
+  }
+
+  async function onScanFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // allow re-picking the same file
+    if (!file) return;
+
+    setScanning(true);
+    setScanError(null);
+    setScanFilled(false);
+    try {
+      const imageBase64 = await fileToBase64(file);
+      const res = await fetch("/api/scan-strip", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ imageBase64, mimeType: file.type }),
+      });
+      const data = await res.json();
+      if (res.ok && data.values) {
+        const v = data.values;
+        const san =
+          sanitizerType === "chlorine" ? v.freeChlorinePpm : v.brominePpm;
+        const any =
+          v.ph != null ||
+          v.totalAlkalinityPpm != null ||
+          san != null ||
+          v.calciumHardnessPpm != null;
+        if (v.ph != null) setPh(String(v.ph));
+        if (v.totalAlkalinityPpm != null) setTa(String(v.totalAlkalinityPpm));
+        if (san != null) setSanitizer(String(san));
+        if (v.calciumHardnessPpm != null) setCalcium(String(v.calciumHardnessPpm));
+        if (any) {
+          setScanFilled(true);
+        } else {
+          setScanError(
+            "I couldn't read the pads clearly — please type the values in.",
+          );
+        }
+      } else {
+        setScanError(
+          data.error || "Couldn't read that photo — please type the values in.",
+        );
+      }
+    } catch {
+      setScanError("Couldn't read that photo — please type the values in.");
+    } finally {
+      setScanning(false);
+    }
+  }
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -82,6 +153,8 @@ export default function ReadingForm({ sanitizerType, targetRanges }: Props) {
     setCalcium("");
     setIsFreshFill(false);
     setNotes("");
+    setScanError(null);
+    setScanFilled(false);
   }
 
   if (result) {
@@ -118,6 +191,35 @@ export default function ReadingForm({ sanitizerType, targetRanges }: Props) {
           Dip your test strip, then type in what it reads. The app will work out
           exactly what to add.
         </p>
+
+        {scanEnabled ? (
+          <div className="mb-4">
+            <label className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl border-2 border-dashed border-brand-300 bg-brand-50 px-4 py-3 text-sm font-semibold text-brand-700 transition hover:bg-brand-100">
+              <input
+                type="file"
+                accept="image/*"
+                capture="environment"
+                onChange={onScanFile}
+                disabled={scanning}
+                className="hidden"
+              />
+              {scanning ? "📷 Reading your strip…" : "📷 Scan strip with camera"}
+            </label>
+            {scanFilled ? (
+              <p className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                🤖 I filled these in from your photo — please check every value
+                against the strip before saving, especially the{" "}
+                {sanitizerType === "chlorine" ? "chlorine" : "bromine"}.
+              </p>
+            ) : null}
+            {scanError ? (
+              <p className="mt-2 text-xs text-slate-500">{scanError}</p>
+            ) : null}
+            <p className="mt-2 text-center text-xs text-slate-400">
+              or type the readings in below
+            </p>
+          </div>
+        ) : null}
 
         <div className="space-y-4">
           <Field

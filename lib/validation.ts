@@ -77,6 +77,9 @@ export const settingsSchema = z.object({
   avgDailyBathers: z.number().min(0).max(100),
   targetRanges: targetRangesSchema,
   dosingConstants: dosingConstantsSchema,
+  // A town/postcode to (re)resolve for the weather feature; "" clears it,
+  // undefined leaves the stored location unchanged.
+  locationQuery: z.string().max(200).optional(),
 });
 export type SettingsInput = z.infer<typeof settingsSchema>;
 

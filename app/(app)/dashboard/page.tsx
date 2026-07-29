@@ -18,6 +18,7 @@ import { computeNextDue } from "@/lib/tasks";
 import { calculateRecommendations } from "@/lib/chemistry";
 import { computeWaterChangeIntervalDays, daysSince, usageWaterStatus } from "@/lib/water";
 import { buildForecasts } from "@/lib/predict";
+import { getForecast, weatherAdvice, type WeatherForecast } from "@/lib/weather";
 import {
   dueStatusLabel,
   dueStatusTone,
@@ -96,6 +97,19 @@ export default async function DashboardPage() {
   const usageStatus = usageAvailable
     ? usageWaterStatus(config.volumeLitres, cumulativeBathers as number)
     : null;
+
+  // Weather (only when a location is set; fetch failures just hide the card).
+  let weather: WeatherForecast | null = null;
+  if (settings.latitude != null && settings.longitude != null) {
+    weather = await getForecast(
+      Number(settings.latitude),
+      Number(settings.longitude),
+      settings.location_name ?? undefined,
+    );
+  }
+  const advisories = weather
+    ? weatherAdvice(weather, config.sanitizerType)
+    : [];
 
   return (
     <div className="space-y-4">
@@ -240,6 +254,57 @@ export default async function DashboardPage() {
         </p>
       </Card>
 
+      {/* Weather */}
+      {weather && weather.days.length > 0 ? (
+        <Card>
+          <div className="mb-2 flex items-center justify-between">
+            <h2 className="font-semibold text-slate-800">Weather</h2>
+            {weather.locationName ? (
+              <span className="text-xs text-slate-400">
+                📍 {weather.locationName}
+              </span>
+            ) : null}
+          </div>
+          <div className="grid grid-cols-3 gap-2 text-center">
+            {weather.days.slice(0, 3).map((d) => (
+              <div key={d.date} className="rounded-xl bg-slate-50 py-2">
+                <div className="text-xs text-slate-500">
+                  {new Date(d.date).toLocaleDateString("en-GB", {
+                    weekday: "short",
+                  })}
+                </div>
+                <div className="text-sm font-semibold text-slate-800">
+                  {Math.round(d.tempMax)}°
+                </div>
+                <div className="text-xs text-slate-400">
+                  {Math.round(d.tempMin)}°
+                </div>
+              </div>
+            ))}
+          </div>
+          {advisories.length > 0 ? (
+            <ul className="mt-3 space-y-2">
+              {advisories.map((a) => (
+                <li
+                  key={a.code}
+                  className={`rounded-xl p-2.5 text-sm ${
+                    a.severity === "warning"
+                      ? "bg-red-50 text-red-800"
+                      : "bg-amber-50 text-amber-900"
+                  }`}
+                >
+                  {a.message}
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="mt-3 text-sm text-slate-500">
+              Nothing weather-related to worry about right now.
+            </p>
+          )}
+        </Card>
+      ) : null}
+
       {/* Coming up */}
       <Card>
         <div className="mb-3 flex items-center justify-between">
@@ -273,6 +338,17 @@ export default async function DashboardPage() {
             ))}
           </ul>
         )}
+      </Card>
+
+      {/* Something wrong? (troubleshooter) */}
+      <Card>
+        <Link
+          href="/troubleshoot"
+          className="flex items-center justify-between font-medium text-slate-700"
+        >
+          <span>🔎 Something wrong? (cloudy, foamy, green, smelly…)</span>
+          <span className="text-brand-600">→</span>
+        </Link>
       </Card>
 
       {/* Guides & help */}

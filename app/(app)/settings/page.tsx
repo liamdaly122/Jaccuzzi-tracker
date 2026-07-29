@@ -1,7 +1,18 @@
 import { headers } from "next/headers";
 import SettingsForm from "@/components/SettingsForm";
+import CalibrationCard from "@/components/CalibrationCard";
 import SetupNeeded from "@/components/SetupNeeded";
-import { getSettings } from "@/lib/data";
+import {
+  getSettings,
+  toSpaConfig,
+  getRecentReadings,
+  getRecentDosing,
+} from "@/lib/data";
+import {
+  deriveObservations,
+  computeCalibration,
+  type CalibrationSuggestion,
+} from "@/lib/calibrate";
 
 export const dynamic = "force-dynamic";
 
@@ -13,6 +24,28 @@ export default async function SettingsPage() {
     return (
       <SetupNeeded message={err instanceof Error ? err.message : "Unknown error"} />
     );
+  }
+
+  // Self-calibration: learn from the tub's own dose→reading history. Best-effort
+  // — if the dosing/readings tables aren't populated yet, just show the card's
+  // "keep logging" state rather than breaking Settings.
+  let suggestions: CalibrationSuggestion[] = [];
+  let observationCount = 0;
+  try {
+    const config = toSpaConfig(settings);
+    const [readings, dosing] = await Promise.all([
+      getRecentReadings(100),
+      getRecentDosing(100),
+    ]);
+    const calibrateConfig = {
+      volumeLitres: config.volumeLitres,
+      dosingConstants: config.dosingConstants,
+    };
+    const observations = deriveObservations(readings, dosing, calibrateConfig);
+    observationCount = observations.length;
+    suggestions = computeCalibration(observations, calibrateConfig);
+  } catch {
+    // Leave suggestions empty; the card falls back to its "keep logging" copy.
   }
 
   // Build the calendar subscription URL from the incoming request + the token.
@@ -35,6 +68,10 @@ export default async function SettingsPage() {
           Tune your tub, targets, and reminders.
         </p>
       </div>
+      <CalibrationCard
+        suggestions={suggestions}
+        observationCount={observationCount}
+      />
       <SettingsForm settings={settings} icsUrl={icsUrl} />
     </div>
   );

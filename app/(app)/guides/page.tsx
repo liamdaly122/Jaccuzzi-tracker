@@ -15,6 +15,22 @@ export default function GuidesPage() {
         </p>
       </div>
 
+      <Link href="/troubleshoot">
+        <Card className="border-brand-200 bg-brand-50 transition hover:border-brand-300">
+          <div className="flex items-center gap-3">
+            <span className="text-3xl">🔎</span>
+            <div className="flex-1">
+              <p className="font-semibold text-slate-800">Something wrong?</p>
+              <p className="text-sm text-slate-600">
+                Cloudy, foamy, green, or smelly water? Get likely causes and
+                fixes tailored to your latest test.
+              </p>
+            </div>
+            <span className="text-brand-600">→</span>
+          </div>
+        </Card>
+      </Link>
+
       <section className="space-y-3">
         <h2 className="font-semibold text-slate-700">Step-by-step routines</h2>
         {GUIDES.map((g) => (

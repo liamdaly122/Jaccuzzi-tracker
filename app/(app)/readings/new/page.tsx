@@ -1,6 +1,7 @@
 import ReadingForm from "@/components/ReadingForm";
 import SetupNeeded from "@/components/SetupNeeded";
 import { getSettings, toSpaConfig } from "@/lib/data";
+import { isScanConfigured } from "@/lib/gemini";
 
 export const dynamic = "force-dynamic";
 
@@ -14,6 +15,7 @@ export default async function NewReadingPage() {
         <ReadingForm
           sanitizerType={config.sanitizerType}
           targetRanges={config.targetRanges}
+          scanEnabled={isScanConfigured()}
         />
       </div>
     );

@@ -13,6 +13,7 @@ import { computeNextDue } from "@/lib/tasks";
 import { calculateRecommendations } from "@/lib/chemistry";
 import { buildForecasts } from "@/lib/predict";
 import { usageWaterStatus } from "@/lib/water";
+import { getForecast, weatherAdvice } from "@/lib/weather";
 import { sendNtfy } from "@/lib/ntfy";
 
 export const runtime = "nodejs";
@@ -37,10 +38,12 @@ async function handle(request: NextRequest) {
   let chemAlerts: string[] = [];
   let forecastAlerts: string[] = [];
   let usageAlert: string | null = null;
+  let weatherAlerts: string[] = [];
   let hasDanger = false;
 
   try {
-    const config = toSpaConfig(await getSettings());
+    const settings = await getSettings();
+    const config = toSpaConfig(settings);
     const tasks = await getTasks();
     dueTasks = tasks
       .map((t) => ({ name: t.name, info: computeNextDue(toTaskLike(t), now) }))
@@ -98,6 +101,22 @@ async function handle(request: NextRequest) {
     } catch {
       // usage_log table not set up yet — skip silently.
     }
+
+    // Weather advisories (frost/heat) if a location is set.
+    if (settings.latitude != null && settings.longitude != null) {
+      const forecast = await getForecast(
+        Number(settings.latitude),
+        Number(settings.longitude),
+        settings.location_name ?? undefined,
+      );
+      if (forecast) {
+        const advisories = weatherAdvice(forecast, config.sanitizerType).filter(
+          (a) => a.code === "frost" || a.code === "heat",
+        );
+        weatherAlerts = advisories.map((a) => a.message);
+        if (advisories.some((a) => a.code === "frost")) hasDanger = true;
+      }
+    }
   } catch (err) {
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Cron failed" },
@@ -110,6 +129,7 @@ async function handle(request: NextRequest) {
   if (chemAlerts.length) parts.push(`Water: ${chemAlerts.join(" ")}`);
   if (forecastAlerts.length) parts.push(`Forecast: ${forecastAlerts.join(", ")}`);
   if (usageAlert) parts.push(usageAlert);
+  if (weatherAlerts.length) parts.push(`Weather: ${weatherAlerts.join(" ")}`);
   const summary = parts.join(" · ");
 
   // Idempotent per-day guard + the daily DB write that prevents auto-pause.
@@ -141,6 +161,7 @@ async function handle(request: NextRequest) {
     chemAlerts,
     forecastAlerts,
     usageAlert,
+    weatherAlerts,
   });
 }
 

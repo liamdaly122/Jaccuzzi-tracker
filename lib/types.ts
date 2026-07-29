@@ -20,6 +20,9 @@ export interface SpaSettings {
   target_ranges: TargetRanges;
   dosing_constants: DosingConstants;
   avg_daily_bathers: number;
+  latitude: number | null;
+  longitude: number | null;
+  location_name: string | null;
   updated_at: string;
 }
 

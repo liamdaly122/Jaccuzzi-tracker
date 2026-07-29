@@ -55,13 +55,16 @@ export default function SettingsForm({ settings, icsUrl }: Props) {
   const [constants, setConstants] = useState<DosingConstants>(
     settings.dosing_constants,
   );
+  const [location, setLocation] = useState(settings.location_name ?? "");
   const [status, setStatus] = useState<"idle" | "saving" | "saved" | "error">(
     "idle",
   );
+  const [locationNote, setLocationNote] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
   async function save() {
     setStatus("saving");
+    setLocationNote(null);
     const res = await fetch("/api/settings", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
@@ -71,9 +74,16 @@ export default function SettingsForm({ settings, icsUrl }: Props) {
         avgDailyBathers: Number(bathers),
         targetRanges: ranges,
         dosingConstants: constants,
+        locationQuery: location,
       }),
     });
     if (res.ok) {
+      const data = await res.json().catch(() => ({}));
+      if (data.geocodeFailed) {
+        setLocationNote(
+          "Couldn't find that place — try a town or postcode (everything else saved).",
+        );
+      }
       setStatus("saved");
       router.refresh();
       setTimeout(() => setStatus("idle"), 2000);
@@ -137,6 +147,29 @@ export default function SettingsForm({ settings, icsUrl }: Props) {
           />
         </Field>
         <WaterChangeHint volume={Number(volume)} bathers={Number(bathers)} />
+      </Card>
+
+      {/* Weather location */}
+      <Card>
+        <Field
+          label="Your location (for weather warnings)"
+          hint="A town or postcode is enough. Used only to warn you about frost or hot spells — leave blank to turn weather off."
+        >
+          <input
+            type="text"
+            value={location}
+            onChange={(e) => setLocation(e.target.value)}
+            className={inputClass}
+            placeholder="e.g. Leeds"
+          />
+        </Field>
+        {locationNote ? (
+          <p className="mt-2 text-sm text-amber-700">{locationNote}</p>
+        ) : settings.location_name ? (
+          <p className="mt-2 text-xs text-slate-400">
+            📍 Currently: {settings.location_name}
+          </p>
+        ) : null}
       </Card>
 
       {/* Advanced: target ranges */}

@@ -58,6 +58,11 @@ on conflict (id) do nothing;
 alter table spa_settings
   add column if not exists avg_daily_bathers numeric(5, 2) not null default 1.5;
 
+-- Weather feature: your rough location (for frost/heat warnings). All nullable.
+alter table spa_settings add column if not exists latitude numeric(8, 4);
+alter table spa_settings add column if not exists longitude numeric(8, 4);
+alter table spa_settings add column if not exists location_name text;
+
 -- -----------------------------------------------------------------------------
 -- test_readings: each time you test your water with a strip.
 -- -----------------------------------------------------------------------------
