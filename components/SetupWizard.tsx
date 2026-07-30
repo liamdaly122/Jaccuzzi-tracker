@@ -9,10 +9,15 @@ import {
   buildStartupPlan,
   isSafeToBathe,
   commissioningChlorineGrams,
+  stagePhase,
 } from "@/lib/startup";
 import { Button, Card } from "./ui";
 import ScanStripButton from "./ScanStripButton";
 import Icon from "./Icon";
+import PhaseStepper from "./setup/PhaseStepper";
+import WaterBalanceGauge, { type GaugeMetric } from "./setup/WaterBalanceGauge";
+import DoseCard from "./setup/DoseCard";
+import WaveTank from "./setup/WaveTank";
 
 interface Props {
   settings: SpaSettings;
@@ -51,6 +56,7 @@ export default function SetupWizard({
   const [note, setNote] = useState<string | null>(null);
   const [safe, setSafe] = useState(false);
   const [finished, setFinished] = useState(false);
+  const [dir, setDir] = useState<"fwd" | "back">("fwd");
 
   const plan = useMemo(
     () => buildStartupPlan(sanitizer, Number(volume) || 0),
@@ -98,10 +104,16 @@ export default function SetupWizard({
     }
   }, [hydrated, stageIndex, sanitizer, volume]);
 
-  const pct = Math.round((stageIndex / (plan.length - 1)) * 100);
+  // Which named phase we're in, and how far through it — drives the stepper.
+  const phase = stagePhase(stage.key);
+  const phaseStages = plan.filter((st) => stagePhase(st.key).index === phase.index);
+  const posInPhase = phaseStages.findIndex((st) => st.key === stage.key);
+  const phaseProgress =
+    phaseStages.length <= 1 ? 0.5 : posInPhase / (phaseStages.length - 1);
 
   function go(delta: number) {
     setNote(null);
+    setDir(delta < 0 ? "back" : "fwd");
     setStageIndex((i) => Math.max(0, Math.min(plan.length - 1, i + delta)));
   }
 
@@ -238,6 +250,42 @@ export default function SetupWizard({
     calc?.recommendations.find((r) => r.order === order && r.severity !== "info") ??
     null;
 
+  // Live gauge of the three numbers that decide whether the water is usable.
+  const num = (v: string) => (v.trim() === "" ? null : Number(v));
+  const r = settings.target_ranges;
+  const gaugeMetrics: GaugeMetric[] = [
+    {
+      label: "pH",
+      value: num(ph),
+      min: r.phIdealMin,
+      max: r.phIdealMax,
+      floor: 6,
+      ceiling: 9,
+      decimals: 1,
+    },
+    {
+      label: "Alkalinity",
+      value: num(ta),
+      min: r.taMin,
+      max: r.taMax,
+      floor: 0,
+      ceiling: 240,
+      unit: "ppm",
+      decimals: 0,
+    },
+    {
+      label: sanitizer === "chlorine" ? "Chlorine" : "Bromine",
+      value: num(san),
+      min: sanitizer === "chlorine" ? r.fcMin : r.brMin,
+      max: sanitizer === "chlorine" ? r.fcMax : r.brMax,
+      floor: 0,
+      ceiling: sanitizer === "chlorine" ? 12 : 20,
+      unit: "ppm",
+      decimals: 1,
+    },
+  ];
+  const hasAnyReading = gaugeMetrics.some((m) => m.value !== null);
+
   // --- shared test-capture block (used by test + retest actions) -------------
   const testInputs = (
     <div className="space-y-3">
@@ -274,8 +322,8 @@ export default function SetupWizard({
   if (finished) {
     return (
       <div className="mx-auto max-w-md px-4 py-16 text-center">
-        <div className="anim-pop mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-emerald-100 text-4xl">
-          🎉
+        <div className="anim-pop mx-auto mb-4 flex h-24 w-24 items-center justify-center rounded-full bg-emerald-50 text-emerald-600 shadow-[0_10px_30px_-10px_rgba(12,163,12,0.6)] ring-1 ring-emerald-100">
+          <Icon name="check-seal" size={52} strokeWidth={1.5} />
         </div>
         <h1 className="text-2xl font-bold text-slate-800">You&apos;re all set!</h1>
         <p className="mt-2 text-slate-600">
@@ -295,27 +343,25 @@ export default function SetupWizard({
   }
 
   return (
-    <div className="mx-auto flex min-h-screen max-w-md flex-col px-4 py-5">
-      {/* Top bar: progress + exit */}
-      <div className="mb-5">
-        <div className="mb-2 flex items-center justify-between text-xs text-slate-500">
-          <span>
-            Step {stageIndex + 1} of {plan.length}
+    <div className="safe-area mx-auto flex min-h-screen max-w-md flex-col">
+      {/* Top bar: phase progress + exit */}
+      <div className="mb-6">
+        <div className="mb-2.5 flex items-center justify-between">
+          <span className="micro-label text-slate-400">
+            {phase.label} · step {stageIndex + 1} of {plan.length}
           </span>
-          <Link href="/dashboard" className="font-medium text-slate-400">
+          <Link href="/dashboard" className="text-xs font-medium text-slate-400">
             Save &amp; exit
           </Link>
         </div>
-        <div className="h-1.5 overflow-hidden rounded-full bg-slate-200">
-          <div
-            className="h-full rounded-full bg-brand-500 transition-all duration-500"
-            style={{ width: `${pct}%` }}
-          />
-        </div>
+        <PhaseStepper currentPhase={phase.index} phaseProgress={phaseProgress} />
       </div>
 
       {/* Stage card — keyed so the entrance animation replays each step */}
-      <div key={stage.key} className="anim-stage flex-1">
+      <div
+        key={stage.key}
+        className={`flex-1 ${dir === "back" ? "anim-slide-back" : "anim-slide-fwd"}`}
+      >
         <div className="mb-5 text-center">
           <div className="anim-pop mx-auto mb-3 flex h-20 w-20 items-center justify-center rounded-full bg-white text-brand-600 shadow-[0_8px_24px_-8px_rgba(35,133,240,0.55)] ring-1 ring-brand-100">
             <Icon name={stage.icon} size={40} strokeWidth={1.6} />
@@ -326,13 +372,15 @@ export default function SetupWizard({
         <Card>
           <p className="text-slate-600">{stage.body}</p>
           {stage.tip ? (
-            <p className="mt-3 rounded-lg bg-brand-50 px-3 py-2 text-sm text-brand-800">
-              💡 {stage.tip}
+            <p className="mt-3 flex items-start gap-2 rounded-xl bg-brand-50 px-3 py-2.5 text-sm text-brand-800">
+              <Icon name="bulb" size={15} className="mt-0.5 shrink-0" />
+              <span>{stage.tip}</span>
             </p>
           ) : null}
           {stage.safety ? (
-            <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">
-              ⚠️ {stage.safety}
+            <p className="mt-3 flex items-start gap-2 rounded-xl bg-amber-50 px-3 py-2.5 text-sm text-amber-800">
+              <Icon name="alert-triangle" size={15} className="mt-0.5 shrink-0" />
+              <span>{stage.safety}</span>
             </p>
           ) : null}
 
@@ -401,10 +449,15 @@ export default function SetupWizard({
         );
 
       case "fill":
-        return <WaterFill />;
+        return <WaveTank level={0.66} />;
 
       case "test":
-        return testInputs;
+        return (
+          <div className="anim-stagger space-y-4">
+            {testInputs}
+            {hasAnyReading ? <WaterBalanceGauge metrics={gaugeMetrics} /> : null}
+          </div>
+        );
 
       case "alkalinity":
         return renderDoseStage(1, "Alkalinity");
@@ -415,17 +468,23 @@ export default function SetupWizard({
       case "sanitiser":
         return (
           <div className="space-y-3">
-            <ul className="space-y-2">
-              {(stage.doses ?? []).map((d, i) => (
-                <li
-                  key={i}
-                  className="rounded-xl border border-slate-200 bg-slate-50 p-3"
-                >
-                  <p className="text-sm text-slate-700">{d.label}</p>
-                  <p className="text-lg font-bold text-slate-900">{d.amount}</p>
-                </li>
-              ))}
-            </ul>
+            <div className="anim-stagger space-y-3">
+              {(stage.doses ?? []).map((d, i) => {
+                const m = /^([\d.]+)\s*(\S+)/.exec(d.amount);
+                const value = m ? Number(m[1]) : 0;
+                const unit = m ? m[2] : "";
+                return (
+                  <DoseCard
+                    key={i}
+                    label={d.label}
+                    amount={value}
+                    unit={unit}
+                    showTeaspoons={unit === "g"}
+                    fill={0.35 + Math.min(0.5, i * 0.15)}
+                  />
+                );
+              })}
+            </div>
             {sanitizer === "chlorine" ? (
               <Button
                 variant="secondary"
@@ -444,9 +503,12 @@ export default function SetupWizard({
       case "wait":
         return (
           <div className="space-y-4">
-            <div className="flex items-center justify-center py-2">
-              <div className="anim-pulse-soft text-5xl">💤</div>
+            <div className="flex items-center justify-center py-1">
+              <div className="anim-pulse-soft text-brand-400">
+                <Icon name="hourglass" size={40} strokeWidth={1.5} />
+              </div>
             </div>
+            {hasAnyReading ? <WaterBalanceGauge metrics={gaugeMetrics} /> : null}
             <p className="text-center text-sm text-slate-500">
               When you&apos;ve waited, test again to check it&apos;s safe.
             </p>
@@ -483,7 +545,8 @@ export default function SetupWizard({
 
       case "final":
         return (
-          <div className="space-y-2 text-center text-sm text-slate-500">
+          <div className="space-y-3 text-center text-sm text-slate-500">
+            {hasAnyReading ? <WaterBalanceGauge metrics={gaugeMetrics} /> : null}
             {safe ? (
               <p className="font-medium text-emerald-700">
                 ✓ Your water is safe and balanced.
@@ -646,14 +709,5 @@ function LabelledInput({
         className="w-full rounded-lg border border-slate-300 px-2 py-2 text-base outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-200"
       />
     </label>
-  );
-}
-
-// A small decorative "filling tub" illustration for the fill step.
-function WaterFill() {
-  return (
-    <div className="mx-auto flex h-28 w-40 items-end overflow-hidden rounded-2xl border-2 border-brand-200 bg-brand-50">
-      <div className="anim-water-rise h-full w-full origin-bottom bg-gradient-to-t from-brand-400 to-brand-300 opacity-80" />
-    </div>
   );
 }
