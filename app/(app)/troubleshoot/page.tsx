@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Card } from "@/components/ui";
+import Icon from "@/components/Icon";
 import { listSymptoms } from "@/lib/troubleshoot";
 
 // Static symptom list — no database needed, so it works even before setup.
@@ -26,7 +27,7 @@ export default function TroubleshootPage() {
           <Link key={s.key} href={`/troubleshoot/${s.key}`}>
             <Card className="transition hover:border-brand-300">
               <div className="flex items-center gap-3">
-                <span className="text-3xl">{s.emoji}</span>
+                <Icon name={s.icon} size={30} className="text-brand-600" />
                 <div className="flex-1">
                   <p className="font-semibold text-slate-800">{s.title}</p>
                   <p className="text-sm text-slate-500">{s.blurb}</p>

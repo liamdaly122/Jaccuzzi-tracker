@@ -6,6 +6,8 @@
 //  amounts.
 // =============================================================================
 
+import type { IconName } from "./icons";
+
 export interface GuideStep {
   title: string;
   detail: string;
@@ -15,7 +17,7 @@ export interface GuideStep {
 export interface Guide {
   key: string;
   title: string;
-  emoji: string;
+  icon: IconName;
   intro: string;
   // Some guides map onto a maintenance task, so finishing can tick it off.
   completesTaskKey?: string;
@@ -28,7 +30,7 @@ export const GUIDES: Guide[] = [
   {
     key: "fresh-fill-startup",
     title: "Fresh-fill startup",
-    emoji: "🚿",
+    icon: "shower",
     intro:
       "Starting with brand-new water? Follow these steps in order to get the water balanced and safe. Balance always goes: alkalinity → pH → sanitizer → shock.",
     steps: [
@@ -80,7 +82,7 @@ export const GUIDES: Guide[] = [
   {
     key: "drain-and-refill-day",
     title: "Drain & refill day",
-    emoji: "🧽",
+    icon: "filter",
     completesTaskKey: "drain_refill",
     resetsUsage: true,
     intro:

@@ -12,6 +12,7 @@ import {
 } from "@/lib/startup";
 import { Button, Card } from "./ui";
 import ScanStripButton from "./ScanStripButton";
+import Icon from "./Icon";
 
 interface Props {
   settings: SpaSettings;
@@ -316,7 +317,9 @@ export default function SetupWizard({
       {/* Stage card — keyed so the entrance animation replays each step */}
       <div key={stage.key} className="anim-stage flex-1">
         <div className="mb-5 text-center">
-          <div className="mx-auto mb-3 text-5xl">{stage.emoji}</div>
+          <div className="anim-pop mx-auto mb-3 flex h-20 w-20 items-center justify-center rounded-full bg-white text-brand-600 shadow-[0_8px_24px_-8px_rgba(35,133,240,0.55)] ring-1 ring-brand-100">
+            <Icon name={stage.icon} size={40} strokeWidth={1.6} />
+          </div>
           <h1 className="text-2xl font-bold text-slate-800">{stage.title}</h1>
         </div>
 

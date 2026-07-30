@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import GuideRunner from "@/components/GuideRunner";
+import Icon from "@/components/Icon";
 import { getGuide } from "@/lib/guides";
 import { getTasks } from "@/lib/data";
 
@@ -31,8 +32,9 @@ export default async function GuidePage({ params }: { params: Params }) {
       <Link href="/guides" className="text-sm font-medium text-brand-600">
         ← All guides
       </Link>
-      <h1 className="text-2xl font-bold text-slate-800">
-        {guide.emoji} {guide.title}
+      <h1 className="flex items-center gap-2.5 text-2xl font-bold text-slate-800">
+        <Icon name={guide.icon} size={28} className="text-brand-600" />
+        {guide.title}
       </h1>
       <GuideRunner guide={guide} completesTaskId={completesTaskId} />
     </div>

@@ -7,6 +7,7 @@
 // =============================================================================
 
 import type { SpaConfig } from "./chemistry";
+import type { IconName } from "./icons";
 
 // A tolerant reading shape: every value may be missing. Mapped from a
 // TestReadingRow by the page (or null when no reading exists yet).
@@ -46,7 +47,7 @@ export interface Cause {
 interface SymptomDef {
   key: string;
   title: string;
-  emoji: string;
+  icon: IconName;
   blurb: string;
   causes: CauseDef[];
 }
@@ -54,7 +55,7 @@ interface SymptomDef {
 export interface Symptom {
   key: string;
   title: string;
-  emoji: string;
+  icon: IconName;
   blurb: string;
 }
 
@@ -102,7 +103,7 @@ const SYMPTOMS: SymptomDef[] = [
   {
     key: "cloudy",
     title: "Cloudy or milky water",
-    emoji: "🌫️",
+    icon: "cloud",
     blurb: "The water has gone hazy, dull, or milky instead of clear.",
     causes: [
       {
@@ -139,7 +140,7 @@ const SYMPTOMS: SymptomDef[] = [
   {
     key: "foamy",
     title: "Foamy water",
-    emoji: "🫧",
+    icon: "bubbles",
     blurb: "Foam or bubbles that linger on the surface, especially with the jets on.",
     causes: [
       {
@@ -164,7 +165,7 @@ const SYMPTOMS: SymptomDef[] = [
   {
     key: "green",
     title: "Green or algae water",
-    emoji: "🟢",
+    icon: "leaf",
     blurb: "A green tint, or slippery green patches on the walls or floor.",
     causes: [
       {
@@ -189,7 +190,7 @@ const SYMPTOMS: SymptomDef[] = [
   {
     key: "smelly",
     title: "Smelly water",
-    emoji: "👃",
+    icon: "nose",
     blurb: "A strong chlorine smell, or a musty / eggy / stale odour.",
     causes: [
       {
@@ -215,7 +216,7 @@ const SYMPTOMS: SymptomDef[] = [
   {
     key: "itchy",
     title: "Itchy skin after soaking",
-    emoji: "🧖",
+    icon: "person",
     blurb: "Skin feels itchy, dry, or irritated after getting out.",
     causes: [
       {
@@ -240,7 +241,7 @@ const SYMPTOMS: SymptomDef[] = [
   {
     key: "eyes",
     title: "Stinging eyes or irritation",
-    emoji: "😖",
+    icon: "eye",
     blurb: "Eyes sting or the water feels harsh during a soak.",
     causes: [
       {
@@ -266,7 +267,7 @@ const SYMPTOMS: SymptomDef[] = [
   {
     key: "wont_hold_sanitizer",
     title: "Won't hold sanitizer",
-    emoji: "🕳️",
+    icon: "drain",
     blurb: "Chlorine or bromine keeps disappearing soon after you add it.",
     causes: [
       {
@@ -298,7 +299,7 @@ const SYMPTOMS: SymptomDef[] = [
   {
     key: "scale",
     title: "Scale or white flakes",
-    emoji: "🧊",
+    icon: "snowflake",
     blurb: "White crust on the waterline, or white flakes floating in the water.",
     causes: [
       {
@@ -326,10 +327,10 @@ const SYMPTOM_MAP = new Map(SYMPTOMS.map((s) => [s.key, s]));
 
 // The list for the symptom-picker page.
 export function listSymptoms(): Symptom[] {
-  return SYMPTOMS.map(({ key, title, emoji, blurb }) => ({
+  return SYMPTOMS.map(({ key, title, icon, blurb }) => ({
     key,
     title,
-    emoji,
+    icon,
     blurb,
   }));
 }
@@ -370,7 +371,7 @@ export function diagnose(
     .map((x) => x.c);
 
   return {
-    symptom: { key: def.key, title: def.title, emoji: def.emoji, blurb: def.blurb },
+    symptom: { key: def.key, title: def.title, icon: def.icon, blurb: def.blurb },
     causes: ordered,
     hasReading: reading != null,
   };

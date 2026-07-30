@@ -34,7 +34,7 @@ describe("listSymptoms", () => {
     for (const s of symptoms) {
       expect(s.title.length).toBeGreaterThan(0);
       expect(s.blurb.length).toBeGreaterThan(0);
-      expect(s.emoji.length).toBeGreaterThan(0);
+      expect(s.icon.length).toBeGreaterThan(0);
     }
   });
 

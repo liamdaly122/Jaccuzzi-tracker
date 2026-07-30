@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Card } from "@/components/ui";
+import Icon from "@/components/Icon";
 import { GUIDES } from "@/lib/guides";
 import { TIPS } from "@/lib/tips";
 
@@ -42,7 +43,7 @@ export default function GuidesPage() {
           >
             <Card className="transition hover:border-brand-300">
               <div className="flex items-center gap-3">
-                <span className="text-3xl">{g.emoji}</span>
+                <Icon name={g.icon} size={30} className="text-brand-600" />
                 <div className="flex-1">
                   <p className="font-semibold text-slate-800">
                     {g.title}
@@ -64,7 +65,7 @@ export default function GuidesPage() {
         {TIPS.map((t) => (
           <Card key={t.key}>
             <div className="flex items-start gap-3">
-              <span className="text-2xl">{t.emoji}</span>
+              <Icon name={t.icon} size={24} className="text-brand-600" />
               <div>
                 <p className="font-semibold text-slate-800">{t.title}</p>
                 <p className="mt-0.5 text-sm text-slate-600">{t.what}</p>

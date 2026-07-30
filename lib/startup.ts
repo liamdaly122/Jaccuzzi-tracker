@@ -24,6 +24,7 @@ import {
   type SpaConfig,
   type TestReadingInput,
 } from "./chemistry";
+import type { IconName } from "./icons";
 
 // --- Fresh-fill dose constants (per litre unless noted) ----------------------
 export const CHLORINE_COMMISSION_G_PER_L = 0.02; // booster to ~10 ppm
@@ -96,7 +97,7 @@ export interface StartupStage {
   key: StartupStageKey;
   kind: StartupStageKind;
   title: string;
-  emoji: string;
+  icon: IconName;
   body: string;
   tip?: string;
   safety?: string;
@@ -125,7 +126,7 @@ export function buildStartupPlan(
         key: "sanitiser",
         kind: "dose",
         title: "Add your chlorine",
-        emoji: "💧",
+        icon: "droplet",
         body:
           "Fresh water has no sanitiser yet, so we give it a strong first dose (a 'commissioning' dose) to clean and protect it. This also acts as the first shock.",
         doses: [
@@ -143,7 +144,7 @@ export function buildStartupPlan(
         key: "sanitiser",
         kind: "dose",
         title: "Build your bromine",
-        emoji: "🟠",
+        icon: "bromine",
         body:
           "Brand-new water has no 'bromide bank', so tablets alone would read near zero for days. We build the bank first, then let tablets keep it topped up. Pick ONE way to build it, then load the dispenser.",
         doses: [
@@ -174,7 +175,7 @@ export function buildStartupPlan(
     key: "wait",
     kind: "gate",
     title: "Wait until it's safe",
-    emoji: "⏳",
+    icon: "hourglass",
     body: isChlorine
       ? "That first dose pushes chlorine high on purpose. Do NOT get in until it falls back to 5 ppm or below — usually around 24 hours. Keep the pump circulating."
       : "Give the bank time to settle. Do NOT get in until bromine falls to 5 ppm or below — bromine is slower than chlorine, so allow a bit longer. Keep the pump circulating.",
@@ -187,7 +188,7 @@ export function buildStartupPlan(
       key: "welcome",
       kind: "info",
       title: "Fresh water setup",
-      emoji: "🚿",
+      icon: "shower",
       body:
         "Let's get your new water balanced and safe, one calm step at a time. Most of the time is just waiting for the water to settle — the hands-on part is quick.",
       tip: `Before you start, have these ready: ${stripWord}, ${
@@ -200,7 +201,7 @@ export function buildStartupPlan(
       key: "sanitizer",
       kind: "choice",
       title: "Chlorine or bromine?",
-      emoji: "⚗️",
+      icon: "flask",
       body:
         "Which sanitiser are you using? This changes the whole routine, so it's the first thing to decide. We'll remember your choice across the app.",
       tip: "Chlorine: cheaper, add granules regularly. Bromine: gentler at hot temperatures, uses tablets plus a weekly shock.",
@@ -209,7 +210,7 @@ export function buildStartupPlan(
       key: "volume",
       kind: "input",
       title: "How much water?",
-      emoji: "📏",
+      icon: "ruler",
       body:
         "Confirm your tub's volume so every dose is worked out for YOUR tub. A Lay-Z-Spa San Francisco holds about 1050 L filled to the line.",
     },
@@ -217,7 +218,7 @@ export function buildStartupPlan(
       key: "fill",
       kind: "info",
       title: "Fill the tub",
-      emoji: "🪣",
+      icon: "bucket",
       body:
         "Fill to the marked line with fresh cold water, ideally through the filter housing to avoid airlocks. Never run the pump dry.",
       tip: "A garden hose is fine. Hard tap water is normal — you'll balance it next.",
@@ -226,7 +227,7 @@ export function buildStartupPlan(
       key: "heat",
       kind: "info",
       title: "Switch on & heat",
-      emoji: "🌡️",
+      icon: "thermometer",
       body:
         "Turn the tub on and set your target temperature (many people use 37–38°C). Balancing works best with the water circulating.",
     },
@@ -234,7 +235,7 @@ export function buildStartupPlan(
       key: "test",
       kind: "test",
       title: "Test the water",
-      emoji: "🧪",
+      icon: "flask",
       body: `Dip a strip (or snap a photo) and enter the numbers. Fresh tap water is often low in everything — that's expected. Use ${stripWord}.`,
       tip: "This gives the exact amounts for the next steps.",
     },
@@ -242,7 +243,7 @@ export function buildStartupPlan(
       key: "alkalinity",
       kind: "dose",
       title: "Balance alkalinity first",
-      emoji: "🧊",
+      icon: "snowflake",
       body:
         "Alkalinity is the buffer that keeps pH steady, so it always comes first. Aim for 80–120 ppm. Add the amount shown, run the pump to mix, wait, then retest.",
       safety: DISCLAIMER,
@@ -251,7 +252,7 @@ export function buildStartupPlan(
       key: "ph",
       kind: "dose",
       title: "Then adjust pH",
-      emoji: "⚖️",
+      icon: "balance",
       body:
         "With alkalinity in range, nudge pH into 7.2–7.6. pH doesn't move in a straight line, so add small amounts, circulate, and retest.",
       safety: DISCLAIMER,
@@ -262,7 +263,7 @@ export function buildStartupPlan(
       key: "final",
       kind: "done",
       title: "Final check",
-      emoji: "✅",
+      icon: "check-seal",
       body: `Do one last test. When ${sanitizerWord} is 3–5 ppm and pH is 7.2–7.6 with no red warning, you're good to go. Finishing resets your water-freshness and drain schedule for the new water.`,
       tip: isChlorine
         ? "From now on: keep chlorine at 3–5 ppm and shock weekly."

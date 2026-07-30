@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Card } from "@/components/ui";
+import Icon from "@/components/Icon";
 import {
   diagnose,
   type TroubleshootReading,
@@ -65,8 +66,9 @@ export default async function SymptomPage({ params }: { params: Params }) {
         ← Other problems
       </Link>
       <div>
-        <h1 className="text-2xl font-bold text-slate-800">
-          {diagnosis.symptom.emoji} {diagnosis.symptom.title}
+        <h1 className="flex items-center gap-2.5 text-2xl font-bold text-slate-800">
+          <Icon name={diagnosis.symptom.icon} size={28} className="text-brand-600" />
+          {diagnosis.symptom.title}
         </h1>
         <p className="text-sm text-slate-500">{diagnosis.symptom.blurb}</p>
       </div>

@@ -1,12 +1,13 @@
 // Shared display helpers (labels, colours, icons). Safe for client & server.
 import type { DueStatus, TaskType } from "./tasks";
+import type { IconName } from "./icons";
 
-export const taskTypeIcons: Record<TaskType, string> = {
-  testing: "🧪",
-  sanitizing: "💧",
-  filter: "🧽",
-  water: "🚿",
-  cleaning: "🧼",
+export const taskTypeIcons: Record<TaskType, IconName> = {
+  testing: "flask",
+  sanitizing: "droplet",
+  filter: "filter",
+  water: "shower",
+  cleaning: "sponge",
 };
 
 // Hex colours (not Tailwind classes) so the dots always render — Tailwind only
