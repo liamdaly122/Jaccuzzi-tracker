@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { Guide } from "@/lib/guides";
 import { Button, Card } from "./ui";
@@ -115,9 +116,28 @@ export default function GuideRunner({
 
       {completesTaskId ? (
         finished ? (
-          <p className="text-center text-sm font-medium text-emerald-700">
-            ✓ Done and logged — your schedule and water freshness have reset.
-          </p>
+          <div className="space-y-3">
+            <p className="text-center text-sm font-medium text-emerald-700">
+              ✓ Done and logged — your schedule and water freshness have reset.
+            </p>
+            {/* Fresh water needs balancing before anyone gets in — hand straight
+                over to the guided setup. */}
+            <Link
+              href="/setup"
+              className="flex items-center justify-between rounded-2xl border-2 border-brand-300 bg-brand-50 p-4"
+            >
+              <span>
+                <span className="block font-semibold text-slate-800">
+                  🚿 Now set up the new water
+                </span>
+                <span className="mt-0.5 block text-sm text-slate-600">
+                  Fresh water isn&apos;t safe until it&apos;s balanced. I&apos;ll
+                  walk you through it.
+                </span>
+              </span>
+              <span className="text-brand-600">→</span>
+            </Link>
+          </div>
         ) : (
           <Button
             onClick={markTaskDone}

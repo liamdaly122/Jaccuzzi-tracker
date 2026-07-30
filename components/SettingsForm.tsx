@@ -305,6 +305,15 @@ export default function SettingsForm({ settings, icsUrl }: Props) {
           <span className="text-brand-600">→</span>
         </Link>
       </Card>
+      <Card>
+        <Link
+          href="/setup"
+          className="flex items-center justify-between font-medium text-slate-700"
+        >
+          <span>🚿 Fresh water setup (guided)</span>
+          <span className="text-brand-600">→</span>
+        </Link>
+      </Card>
     </div>
   );
 }

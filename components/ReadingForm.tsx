@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import type { CalculationResult, SanitizerType, TargetRanges } from "@/lib/chemistry";
 import { Button, Card, Field, inputClass } from "./ui";
 import RecommendationList from "./RecommendationList";
+import ScanStripButton from "./ScanStripButton";
 
 interface Props {
   sanitizerType: SanitizerType;
@@ -32,109 +33,8 @@ export default function ReadingForm({
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const [scanning, setScanning] = useState(false);
-  const [scanError, setScanError] = useState<string | null>(null);
-  const [scanFilled, setScanFilled] = useState(false);
-
   const num = (s: string): number | null =>
     s.trim() === "" ? null : Number(s);
-
-  const rawBase64 = (dataUrl: string): string => {
-    const comma = dataUrl.indexOf(",");
-    return comma >= 0 ? dataUrl.slice(comma + 1) : dataUrl;
-  };
-
-  function readAsDataUrl(file: File): Promise<string> {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result as string);
-      reader.onerror = () => reject(reader.error);
-      reader.readAsDataURL(file);
-    });
-  }
-
-  // Shrink the photo in the browser before uploading. A test strip doesn't need
-  // full phone resolution, and a smaller JPEG uploads and gets read MUCH faster
-  // (this is what was causing the reader to time out). Falls back to the raw file
-  // if the canvas path isn't available. Returns raw base64 + its mime type.
-  async function fileToScaledJpeg(
-    file: File,
-  ): Promise<{ base64: string; mimeType: string }> {
-    const dataUrl = await readAsDataUrl(file);
-    try {
-      const img = await new Promise<HTMLImageElement>((resolve, reject) => {
-        const i = new Image();
-        i.onload = () => resolve(i);
-        i.onerror = () => reject(new Error("decode failed"));
-        i.src = dataUrl;
-      });
-      const MAX = 1280; // px on the long edge — plenty to read colour pads
-      const scale = Math.min(1, MAX / Math.max(img.width, img.height));
-      const w = Math.max(1, Math.round(img.width * scale));
-      const h = Math.max(1, Math.round(img.height * scale));
-      const canvas = document.createElement("canvas");
-      canvas.width = w;
-      canvas.height = h;
-      const ctx = canvas.getContext("2d");
-      if (!ctx) throw new Error("no 2d context");
-      ctx.drawImage(img, 0, 0, w, h);
-      return {
-        base64: rawBase64(canvas.toDataURL("image/jpeg", 0.85)),
-        mimeType: "image/jpeg",
-      };
-    } catch {
-      // Couldn't downscale (e.g. HEIC decode) — send the original as-is.
-      return { base64: rawBase64(dataUrl), mimeType: file.type };
-    }
-  }
-
-  async function onScanFile(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    e.target.value = ""; // allow re-picking the same file
-    if (!file) return;
-
-    setScanning(true);
-    setScanError(null);
-    setScanFilled(false);
-    try {
-      const { base64: imageBase64, mimeType } = await fileToScaledJpeg(file);
-      const res = await fetch("/api/scan-strip", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ imageBase64, mimeType }),
-      });
-      const data = await res.json();
-      if (res.ok && data.values) {
-        const v = data.values;
-        const san =
-          sanitizerType === "chlorine" ? v.freeChlorinePpm : v.brominePpm;
-        const any =
-          v.ph != null ||
-          v.totalAlkalinityPpm != null ||
-          san != null ||
-          v.calciumHardnessPpm != null;
-        if (v.ph != null) setPh(String(v.ph));
-        if (v.totalAlkalinityPpm != null) setTa(String(v.totalAlkalinityPpm));
-        if (san != null) setSanitizer(String(san));
-        if (v.calciumHardnessPpm != null) setCalcium(String(v.calciumHardnessPpm));
-        if (any) {
-          setScanFilled(true);
-        } else {
-          setScanError(
-            "I couldn't read the pads clearly — please type the values in.",
-          );
-        }
-      } else {
-        setScanError(
-          data.error || "Couldn't read that photo — please type the values in.",
-        );
-      }
-    } catch {
-      setScanError("Couldn't read that photo — please type the values in.");
-    } finally {
-      setScanning(false);
-    }
-  }
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -188,8 +88,6 @@ export default function ReadingForm({
     setCalcium("");
     setIsFreshFill(false);
     setNotes("");
-    setScanError(null);
-    setScanFilled(false);
   }
 
   if (result) {
@@ -229,27 +127,21 @@ export default function ReadingForm({
 
         {scanEnabled ? (
           <div className="mb-4">
-            <label className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl border-2 border-dashed border-brand-300 bg-brand-50 px-4 py-3 text-sm font-semibold text-brand-700 transition hover:bg-brand-100">
-              <input
-                type="file"
-                accept="image/*"
-                capture="environment"
-                onChange={onScanFile}
-                disabled={scanning}
-                className="hidden"
-              />
-              {scanning ? "📷 Reading your strip…" : "📷 Scan strip with camera"}
-            </label>
-            {scanFilled ? (
-              <p className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
-                🤖 I filled these in from your photo — please check every value
-                against the strip before saving, especially the{" "}
-                {sanitizerType === "chlorine" ? "chlorine" : "bromine"}.
-              </p>
-            ) : null}
-            {scanError ? (
-              <p className="mt-2 text-xs text-slate-500">{scanError}</p>
-            ) : null}
+            <ScanStripButton
+              sanitizerType={sanitizerType}
+              onValues={(v) => {
+                const san =
+                  sanitizerType === "chlorine"
+                    ? v.freeChlorinePpm
+                    : v.brominePpm;
+                if (v.ph != null) setPh(String(v.ph));
+                if (v.totalAlkalinityPpm != null)
+                  setTa(String(v.totalAlkalinityPpm));
+                if (san != null) setSanitizer(String(san));
+                if (v.calciumHardnessPpm != null)
+                  setCalcium(String(v.calciumHardnessPpm));
+              }}
+            />
             <p className="mt-2 text-center text-xs text-slate-400">
               or type the readings in below
             </p>

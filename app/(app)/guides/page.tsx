@@ -33,13 +33,21 @@ export default function GuidesPage() {
 
       <section className="space-y-3">
         <h2 className="font-semibold text-slate-700">Step-by-step routines</h2>
+        {/* The fresh-fill routine now has a guided, interactive wizard, so send
+            that one to /setup instead of the plain checklist. */}
         {GUIDES.map((g) => (
-          <Link key={g.key} href={`/guides/${g.key}`}>
+          <Link
+            key={g.key}
+            href={g.key === "fresh-fill-startup" ? "/setup" : `/guides/${g.key}`}
+          >
             <Card className="transition hover:border-brand-300">
               <div className="flex items-center gap-3">
                 <span className="text-3xl">{g.emoji}</span>
                 <div className="flex-1">
-                  <p className="font-semibold text-slate-800">{g.title}</p>
+                  <p className="font-semibold text-slate-800">
+                    {g.title}
+                    {g.key === "fresh-fill-startup" ? " (guided)" : ""}
+                  </p>
                   <p className="text-sm text-slate-500">{g.intro}</p>
                 </div>
                 <span className="text-brand-600">→</span>

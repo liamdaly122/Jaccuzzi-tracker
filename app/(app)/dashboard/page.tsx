@@ -129,6 +129,27 @@ export default async function DashboardPage() {
         </div>
       ) : null}
 
+      {/* Fresh water setup — hero when the tub has no readings yet */}
+      {!latest ? (
+        <Link href="/setup">
+          <Card className="border-2 border-brand-300 bg-gradient-to-br from-brand-50 to-white">
+            <div className="flex items-center gap-3">
+              <span className="text-4xl">🚿</span>
+              <div className="flex-1">
+                <p className="font-bold text-slate-800">
+                  Start here: fresh water setup
+                </p>
+                <p className="text-sm text-slate-600">
+                  New tub or fresh fill? I&apos;ll walk you through getting the
+                  water balanced and safe, step by step.
+                </p>
+              </div>
+              <span className="text-brand-600">→</span>
+            </div>
+          </Card>
+        </Link>
+      ) : null}
+
       {/* Predictive heads-up */}
       {forecasts.length > 0 ? (
         <Card className="border-amber-200 bg-amber-50">
@@ -339,6 +360,19 @@ export default async function DashboardPage() {
           </ul>
         )}
       </Card>
+
+      {/* Fresh water setup (compact — the hero version shows when no readings) */}
+      {latest ? (
+        <Card>
+          <Link
+            href="/setup"
+            className="flex items-center justify-between font-medium text-slate-700"
+          >
+            <span>🚿 Fresh water setup (new fill? start here)</span>
+            <span className="text-brand-600">→</span>
+          </Link>
+        </Card>
+      ) : null}
 
       {/* Something wrong? (troubleshooter) */}
       <Card>
