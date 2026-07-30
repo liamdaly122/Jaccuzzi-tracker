@@ -63,6 +63,16 @@ export function bromineTablets(volumeLitres: number): { min: number; max: number
   };
 }
 
+// Granule conversion for people without kitchen scales. The ClearWater leaflet
+// gives 1 teaspoon ≈ 5 g of granules and says to round to the nearest gram or
+// half-teaspoon, so that's exactly what we do.
+export const GRAMS_PER_TEASPOON = 5;
+
+export function gramsToTeaspoons(grams: number): number {
+  if (!Number.isFinite(grams) || grams <= 0) return 0;
+  return Math.round((grams / GRAMS_PER_TEASPOON) * 2) / 2;
+}
+
 // --- Stage model -------------------------------------------------------------
 export type StartupStageKey =
   | "welcome"
@@ -270,6 +280,39 @@ export function buildStartupPlan(
         : `From now on: keep tablets topped up, and shock weekly with about ${weeklyMpsGrams(volumeLitres)} g of non-chlorine shock to reactivate the bromide bank.`,
     },
   ];
+}
+
+// --- Phases (for the stepper) ------------------------------------------------
+// 11 stages is too many dots to read, so they group into 4 named phases. This
+// makes progress feel meaningful ("Balance") rather than a bare percentage.
+export const STARTUP_PHASES = [
+  "Prepare",
+  "Balance",
+  "Sanitise",
+  "Safe",
+] as const;
+export type StartupPhase = (typeof STARTUP_PHASES)[number];
+
+const STAGE_PHASE: Record<StartupStageKey, number> = {
+  welcome: 0,
+  sanitizer: 0,
+  volume: 0,
+  fill: 0,
+  heat: 0,
+  test: 1,
+  alkalinity: 1,
+  ph: 1,
+  sanitiser: 2,
+  wait: 2,
+  final: 3,
+};
+
+export function stagePhase(key: StartupStageKey): {
+  index: number;
+  label: StartupPhase;
+} {
+  const index = STAGE_PHASE[key] ?? 0;
+  return { index, label: STARTUP_PHASES[index] };
 }
 
 // -----------------------------------------------------------------------------

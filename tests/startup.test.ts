@@ -8,6 +8,9 @@ import {
   bromineTablets,
   buildStartupPlan,
   isSafeToBathe,
+  gramsToTeaspoons,
+  stagePhase,
+  STARTUP_PHASES,
   type StartupStageKey,
 } from "../lib/startup";
 import {
@@ -101,6 +104,50 @@ describe("buildStartupPlan", () => {
   it("the wait stage is a safety gate for both chemistries", () => {
     expect(chlorinePlan.find((s) => s.key === "wait")!.kind).toBe("gate");
     expect(brominePlan.find((s) => s.key === "wait")!.kind).toBe("gate");
+  });
+});
+
+describe("gramsToTeaspoons", () => {
+  it("converts at 5 g per teaspoon", () => {
+    expect(gramsToTeaspoons(5)).toBe(1);
+    expect(gramsToTeaspoons(20)).toBe(4);
+  });
+
+  it("rounds to the nearest half teaspoon (per the leaflet's guidance)", () => {
+    expect(gramsToTeaspoons(21)).toBe(4); // 4.2 -> 4
+    expect(gramsToTeaspoons(22.5)).toBe(4.5); // exact half
+    expect(gramsToTeaspoons(23)).toBe(4.5); // 4.6 -> 4.5
+  });
+
+  it("guards zero / nonsense input", () => {
+    expect(gramsToTeaspoons(0)).toBe(0);
+    expect(gramsToTeaspoons(-5)).toBe(0);
+    expect(gramsToTeaspoons(Number.NaN)).toBe(0);
+  });
+});
+
+describe("stagePhase", () => {
+  it("groups the stages into the four named phases in order", () => {
+    expect(stagePhase("welcome")).toEqual({ index: 0, label: "Prepare" });
+    expect(stagePhase("test")).toEqual({ index: 1, label: "Balance" });
+    expect(stagePhase("sanitiser")).toEqual({ index: 2, label: "Sanitise" });
+    expect(stagePhase("final")).toEqual({ index: 3, label: "Safe" });
+  });
+
+  it("never regresses as the plan advances", () => {
+    const plan = buildStartupPlan("chlorine", 1050);
+    const indexes = plan.map((s) => stagePhase(s.key).index);
+    const sorted = [...indexes].sort((a, b) => a - b);
+    expect(indexes).toEqual(sorted);
+  });
+
+  it("covers every stage of both plans", () => {
+    for (const sanitizer of ["chlorine", "bromine"] as const) {
+      for (const stage of buildStartupPlan(sanitizer, 1050)) {
+        const phase = stagePhase(stage.key);
+        expect(STARTUP_PHASES[phase.index]).toBe(phase.label);
+      }
+    }
   });
 });
 

@@ -130,13 +130,89 @@ input[type="number"]::-webkit-inner-spin-button {
   }
 }
 
+/* Direction-aware stage transitions. */
+.anim-slide-fwd {
+  animation: slide-fwd 0.42s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.anim-slide-back {
+  animation: slide-back 0.42s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* Children fade in one after another. */
+.anim-stagger > * {
+  animation: fade-slide-in 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.anim-stagger > *:nth-child(1) { animation-delay: 0.04s; }
+.anim-stagger > *:nth-child(2) { animation-delay: 0.10s; }
+.anim-stagger > *:nth-child(3) { animation-delay: 0.16s; }
+.anim-stagger > *:nth-child(4) { animation-delay: 0.22s; }
+.anim-stagger > *:nth-child(5) { animation-delay: 0.28s; }
+
+/* Drifting waves (two speeds so the surface never looks like one rigid shape). */
+.anim-wave-back {
+  animation: wave-drift 9s linear infinite;
+}
+.anim-wave-front {
+  animation: wave-drift 6s linear infinite reverse;
+}
+
+/* The gauge marker easing into place. */
+.anim-marker {
+  animation: marker-in 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+@keyframes slide-fwd {
+  from { opacity: 0; transform: translateX(22px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+@keyframes slide-back {
+  from { opacity: 0; transform: translateX(-22px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+@keyframes wave-drift {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+@keyframes marker-in {
+  from { opacity: 0; transform: scale(0.4); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+/* Figures line up in columns and don't jitter while counting up. */
+.num-tabular {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+}
+
+/* Small uppercase section label. */
+.micro-label {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+/* The full-screen wizard must clear phone notches and home bars. */
+.safe-area {
+  padding-top: max(1.25rem, env(safe-area-inset-top));
+  padding-bottom: max(1.25rem, env(safe-area-inset-bottom));
+  padding-left: max(1rem, env(safe-area-inset-left));
+  padding-right: max(1rem, env(safe-area-inset-right));
+}
+
 @media (prefers-reduced-motion: reduce) {
   .anim-stage,
   .anim-water-rise,
   .anim-float,
   .anim-ripple,
   .anim-pop,
-  .anim-pulse-soft {
+  .anim-pulse-soft,
+  .anim-slide-fwd,
+  .anim-slide-back,
+  .anim-stagger > *,
+  .anim-wave-back,
+  .anim-wave-front,
+  .anim-marker {
     animation: none !important;
   }
 }
