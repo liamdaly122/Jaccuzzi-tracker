@@ -4,6 +4,7 @@ import CompleteButton from "@/components/CompleteButton";
 import ApplyIntervalButton from "@/components/ApplyIntervalButton";
 import LogSoakButton from "@/components/LogSoakButton";
 import { Badge, Card, LinkButton } from "@/components/ui";
+import Icon from "@/components/Icon";
 import {
   getSettings,
   toSpaConfig,
@@ -120,7 +121,10 @@ export default async function DashboardPage() {
 
       {hasDanger ? (
         <div className="rounded-2xl border-2 border-red-400 bg-red-100 p-4">
-          <p className="font-bold text-red-800">⚠️ Do not use the spa yet</p>
+          <p className="flex items-center gap-2 font-bold text-red-800">
+            <Icon name="alert-triangle" size={20} />
+            Do not use the spa yet
+          </p>
           <ul className="mt-1 list-disc space-y-0.5 pl-5 text-sm text-red-800">
             {calc!.safetyFlags.map((f) => (
               <li key={f.code}>{f.message}</li>
@@ -134,7 +138,7 @@ export default async function DashboardPage() {
         <Link href="/setup">
           <Card className="border-2 border-brand-300 bg-gradient-to-br from-brand-50 to-white">
             <div className="flex items-center gap-3">
-              <span className="text-4xl">🚿</span>
+              <Icon name="shower" size={36} className="text-brand-600" />
               <div className="flex-1">
                 <p className="font-bold text-slate-800">
                   Start here: fresh water setup
@@ -153,12 +157,19 @@ export default async function DashboardPage() {
       {/* Predictive heads-up */}
       {forecasts.length > 0 ? (
         <Card className="border-amber-200 bg-amber-50">
-          <h2 className="mb-2 font-semibold text-amber-900">🔮 Heads-up</h2>
+          <h2 className="mb-2 flex items-center gap-2 font-semibold text-amber-900">
+            <Icon name="trend-up" size={18} />
+            Heads-up
+          </h2>
           <ul className="space-y-2">
             {forecasts.map((f) => (
               <li key={f.key} className="text-sm text-amber-900">
                 <span className="mr-1">
-                  {f.severity === "warning" ? "⚠️" : "•"}
+                  {f.severity === "warning" ? (
+                    <Icon name="alert-triangle" size={14} className="inline align-[-2px]" />
+                  ) : (
+                    "•"
+                  )}
                 </span>
                 {f.message}
               </li>
@@ -201,13 +212,15 @@ export default async function DashboardPage() {
         )}
         <div className="mt-4 space-y-2">
           <LinkButton href="/readings/new" className="w-full">
-            🧪 Test the water now
+            <Icon name="flask" size={18} className="mr-2" />
+            Test the water now
           </LinkButton>
           <Link
             href="/trends"
             className="block text-center text-sm font-medium text-brand-600"
           >
-            📈 View trends
+            <Icon name="chart-line" size={16} className="mr-1.5 inline align-[-3px]" />
+            View trends
           </Link>
         </div>
       </Card>
@@ -234,7 +247,7 @@ export default async function DashboardPage() {
             </div>
             <p className="mt-2 text-sm text-slate-600">
               {usageStatus.changeDue
-                ? "🚿 Based on how much it's been used, it's time to drain & refill."
+                ? "Based on how much it's been used, it's time to drain & refill."
                 : `About ${usageStatus.remaining} more person-soaks before a change is due.`}
             </p>
           </div>
@@ -282,7 +295,8 @@ export default async function DashboardPage() {
             <h2 className="font-semibold text-slate-800">Weather</h2>
             {weather.locationName ? (
               <span className="text-xs text-slate-400">
-                📍 {weather.locationName}
+                <Icon name="pin" size={12} className="mr-1 inline align-[-1px]" />
+                {weather.locationName}
               </span>
             ) : null}
           </div>
@@ -336,7 +350,7 @@ export default async function DashboardPage() {
         </div>
         {dueTasks.length === 0 ? (
           <p className="text-sm text-slate-500">
-            🎉 Nothing due right now. You&apos;re all caught up.
+            Nothing due right now. You&apos;re all caught up.
           </p>
         ) : (
           <ul className="space-y-2">
@@ -368,7 +382,10 @@ export default async function DashboardPage() {
             href="/setup"
             className="flex items-center justify-between font-medium text-slate-700"
           >
-            <span>🚿 Fresh water setup (new fill? start here)</span>
+            <span className="flex items-center gap-2.5">
+              <Icon name="shower" size={20} className="text-brand-600" />
+              Fresh water setup (new fill? start here)
+            </span>
             <span className="text-brand-600">→</span>
           </Link>
         </Card>
@@ -380,7 +397,10 @@ export default async function DashboardPage() {
           href="/troubleshoot"
           className="flex items-center justify-between font-medium text-slate-700"
         >
-          <span>🔎 Something wrong? (cloudy, foamy, green, smelly…)</span>
+          <span className="flex items-center gap-2.5">
+              <Icon name="search" size={20} className="text-brand-600" />
+              Something wrong? (cloudy, foamy, green, smelly…)
+            </span>
           <span className="text-brand-600">→</span>
         </Link>
       </Card>
@@ -391,7 +411,10 @@ export default async function DashboardPage() {
           href="/guides"
           className="flex items-center justify-between font-medium text-slate-700"
         >
-          <span>📋 Guides &amp; help (routines + what chemicals do)</span>
+          <span className="flex items-center gap-2.5">
+              <Icon name="clipboard" size={20} className="text-brand-600" />
+              Guides &amp; help (routines + what chemicals do)
+            </span>
           <span className="text-brand-600">→</span>
         </Link>
       </Card>

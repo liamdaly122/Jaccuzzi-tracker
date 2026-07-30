@@ -1,6 +1,7 @@
 import SetupNeeded from "@/components/SetupNeeded";
 import DeleteReadingButton from "@/components/DeleteReadingButton";
 import { Card } from "@/components/ui";
+import Icon from "@/components/Icon";
 import {
   getRecentReadings,
   getRecentDosing,
@@ -128,7 +129,8 @@ export default async function HistoryPage() {
               <Card key={u.id}>
                 <div className="flex items-center justify-between">
                   <p className="text-sm font-medium text-slate-800">
-                    🛁 {u.bathers} {u.bathers === 1 ? "person" : "people"}
+                    <Icon name="bath" size={14} className="mr-1 inline align-[-2px]" />
+                    {u.bathers} {u.bathers === 1 ? "person" : "people"}
                   </p>
                   <p className="text-xs text-slate-400">
                     {formatDateTime(u.used_at)}

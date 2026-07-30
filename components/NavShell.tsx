@@ -4,13 +4,15 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
+import type { IconName } from "@/lib/icons";
+import Icon from "./Icon";
 
-const navItems = [
-  { href: "/dashboard", label: "Today", icon: "🏠" },
-  { href: "/readings/new", label: "Test", icon: "🧪" },
-  { href: "/calendar", label: "Calendar", icon: "📅" },
-  { href: "/tasks", label: "Upkeep", icon: "✅" },
-  { href: "/settings", label: "Settings", icon: "⚙️" },
+const navItems: { href: string; label: string; icon: IconName }[] = [
+  { href: "/dashboard", label: "Today", icon: "home" },
+  { href: "/readings/new", label: "Test", icon: "flask" },
+  { href: "/calendar", label: "Calendar", icon: "calendar" },
+  { href: "/tasks", label: "Upkeep", icon: "check-circle" },
+  { href: "/settings", label: "Settings", icon: "cog" },
 ];
 
 export default function NavShell({ children }: { children: ReactNode }) {
@@ -27,7 +29,7 @@ export default function NavShell({ children }: { children: ReactNode }) {
     <div className="mx-auto flex min-h-screen w-full max-w-2xl flex-col">
       <header className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-200 bg-white/90 px-4 py-3 backdrop-blur">
         <Link href="/dashboard" className="flex items-center gap-2">
-          <span className="text-xl">🛁</span>
+          <Icon name="bath" size={22} className="text-brand-600" />
           <span className="font-bold text-slate-800">Hot Tub Tracker</span>
         </Link>
         <button
@@ -54,7 +56,7 @@ export default function NavShell({ children }: { children: ReactNode }) {
                   active ? "text-brand-600" : "text-slate-400"
                 }`}
               >
-                <span className="text-xl">{item.icon}</span>
+                <Icon name={item.icon} size={22} strokeWidth={active ? 2 : 1.75} />
                 {item.label}
               </Link>
             );

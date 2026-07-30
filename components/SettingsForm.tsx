@@ -7,6 +7,7 @@ import type { SpaSettings } from "@/lib/types";
 import type { TargetRanges, DosingConstants } from "@/lib/chemistry";
 import { computeWaterChangeIntervalDays } from "@/lib/water";
 import { Button, Card, Field, inputClass } from "./ui";
+import Icon from "./Icon";
 
 interface Props {
   settings: SpaSettings;
@@ -108,7 +109,10 @@ export default function SettingsForm({ settings, icsUrl }: Props) {
                   : "border-slate-200 text-slate-500"
               }`}
             >
-              {type === "chlorine" ? "💧 Chlorine" : "🟠 Bromine"}
+              <span className="flex items-center justify-center gap-1.5">
+                <Icon name={type === "chlorine" ? "droplet" : "bromine"} size={18} />
+                {type === "chlorine" ? "Chlorine" : "Bromine"}
+              </span>
             </button>
           ))}
         </div>
@@ -167,7 +171,8 @@ export default function SettingsForm({ settings, icsUrl }: Props) {
           <p className="mt-2 text-sm text-amber-700">{locationNote}</p>
         ) : settings.location_name ? (
           <p className="mt-2 text-xs text-slate-400">
-            📍 Currently: {settings.location_name}
+            <Icon name="pin" size={12} className="mr-1 inline align-[-1px]" />
+            Currently: {settings.location_name}
           </p>
         ) : null}
       </Card>
@@ -248,7 +253,7 @@ export default function SettingsForm({ settings, icsUrl }: Props) {
       {/* Calendar subscription */}
       <Card>
         <h2 className="mb-2 font-semibold text-slate-800">
-          📅 Add to your phone&apos;s calendar (optional)
+          Add to your phone&apos;s calendar (optional)
         </h2>
         {icsUrl ? (
           <>
@@ -292,7 +297,10 @@ export default function SettingsForm({ settings, icsUrl }: Props) {
           href="/history"
           className="flex items-center justify-between font-medium text-slate-700"
         >
-          <span>📜 View history (readings &amp; doses)</span>
+          <span className="flex items-center gap-2.5">
+            <Icon name="scroll" size={20} className="text-brand-600" />
+            View history (readings &amp; doses)
+          </span>
           <span className="text-brand-600">→</span>
         </Link>
       </Card>
@@ -301,7 +309,10 @@ export default function SettingsForm({ settings, icsUrl }: Props) {
           href="/guides"
           className="flex items-center justify-between font-medium text-slate-700"
         >
-          <span>📋 Guides &amp; help</span>
+          <span className="flex items-center gap-2.5">
+            <Icon name="clipboard" size={20} className="text-brand-600" />
+            Guides &amp; help
+          </span>
           <span className="text-brand-600">→</span>
         </Link>
       </Card>
@@ -310,7 +321,10 @@ export default function SettingsForm({ settings, icsUrl }: Props) {
           href="/setup"
           className="flex items-center justify-between font-medium text-slate-700"
         >
-          <span>🚿 Fresh water setup (guided)</span>
+          <span className="flex items-center gap-2.5">
+            <Icon name="shower" size={20} className="text-brand-600" />
+            Fresh water setup (guided)
+          </span>
           <span className="text-brand-600">→</span>
         </Link>
       </Card>
@@ -334,7 +348,8 @@ function WaterChangeHint({
   );
   return (
     <p className="mt-2 rounded-lg bg-brand-50 px-3 py-2 text-sm text-brand-800">
-      💧 Suggested drain &amp; refill: about every{" "}
+      <Icon name="droplet" size={14} className="mr-1 inline align-[-2px]" />
+      Suggested drain &amp; refill: about every{" "}
       <strong>{intervalDays} days</strong>
       {cappedByMax ? " (light use — quarterly is plenty)" : ""}. You can apply
       this to your schedule from the <strong>Today</strong> screen.

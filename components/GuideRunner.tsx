@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { Guide } from "@/lib/guides";
 import { Button, Card } from "./ui";
+import Icon from "./Icon";
 
 // Interactive checklist for a guide: tick steps off, watch the progress bar,
 // and (for guides that map to a maintenance task) finish by marking it done.
@@ -105,7 +106,8 @@ export default function GuideRunner({
                 </span>
                 {step.tip ? (
                   <span className="mt-1 block text-xs text-brand-700">
-                    💡 {step.tip}
+                    <Icon name="bulb" size={13} className="mr-1 inline align-[-2px]" />
+                    {step.tip}
                   </span>
                 ) : null}
               </span>
@@ -128,7 +130,7 @@ export default function GuideRunner({
             >
               <span>
                 <span className="block font-semibold text-slate-800">
-                  🚿 Now set up the new water
+                  Now set up the new water
                 </span>
                 <span className="mt-0.5 block text-sm text-slate-600">
                   Fresh water isn&apos;t safe until it&apos;s balanced. I&apos;ll

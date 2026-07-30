@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { SanitizerType } from "@/lib/chemistry";
 import type { NormalizedScan } from "@/lib/scan";
+import Icon from "./Icon";
 
 interface Props {
   sanitizerType: SanitizerType;
@@ -128,11 +129,13 @@ export default function ScanStripButton({
           disabled={scanning}
           className="hidden"
         />
-        {scanning ? "📷 Reading your strip…" : "📷 Scan strip with camera"}
+        <Icon name="camera" size={18} />
+        {scanning ? "Reading your strip…" : "Scan strip with camera"}
       </label>
       {scanFilled ? (
         <p className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
-          🤖 I filled these in from your photo — please check every value against
+          <Icon name="sparkles" size={13} className="mr-1 inline align-[-2px]" />
+          I filled these in from your photo — please check every value against
           the strip, especially the{" "}
           {sanitizerType === "chlorine" ? "chlorine" : "bromine"}.
         </p>

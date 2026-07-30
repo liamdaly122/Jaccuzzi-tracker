@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { CalculationResult, Severity } from "@/lib/chemistry";
 import { Badge, Button } from "./ui";
+import Icon from "./Icon";
 
 const severityStyles: Record<Severity, { border: string; tone: Parameters<typeof Badge>[0]["tone"]; label: string }> = {
   safety: { border: "border-red-300 bg-red-50", tone: "red", label: "Safety" },
@@ -24,7 +25,8 @@ export default function RecommendationList({
       {result.safetyFlags.length > 0 ? (
         <div className="rounded-2xl border-2 border-red-400 bg-red-100 p-4">
           <div className="mb-1 flex items-center gap-2 font-bold text-red-800">
-            ⚠️ Do not use the spa yet
+            <Icon name="alert-triangle" size={18} className="mr-1.5 inline align-[-3px]" />
+            Do not use the spa yet
           </div>
           <ul className="list-disc space-y-1 pl-5 text-sm text-red-800">
             {result.safetyFlags.map((f) => (

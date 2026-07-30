@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "./ui";
+import Icon from "./Icon";
 
 // Quick "we used the tub today" logger with a small people-count stepper.
 export default function LogSoakButton() {
@@ -39,7 +40,8 @@ export default function LogSoakButton() {
   if (!open) {
     return (
       <Button variant="secondary" onClick={() => setOpen(true)} className="w-full">
-        🛁 Log a soak
+        <Icon name="bath" size={18} className="mr-1.5 inline align-[-3px]" />
+        Log a soak
       </Button>
     );
   }

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Icon from "@/components/Icon";
 import SetupNeeded from "@/components/SetupNeeded";
 import TrendChart, { type TrendPoint } from "@/components/TrendChart";
 import { Card } from "@/components/ui";
@@ -109,7 +110,10 @@ export default async function TrendsPage() {
           href="/history"
           className="flex items-center justify-between font-medium text-slate-700"
         >
-          <span>📜 See the full numbers (history)</span>
+          <span className="flex items-center gap-2.5">
+            <Icon name="scroll" size={20} className="text-brand-600" />
+            See the full numbers (history)
+          </span>
           <span className="text-brand-600">→</span>
         </Link>
       </Card>

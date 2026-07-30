@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Card, Button } from "./ui";
+import Icon from "./Icon";
 
 // The shape the /api/calibrate GET returns (kept local so this file stays
 // client-safe and doesn't import the server-only data layer).
@@ -57,7 +58,8 @@ export default function CalibrationCard({ suggestions, observationCount }: Props
   return (
     <Card>
       <h2 className="mb-1 font-semibold text-slate-800">
-        🎯 Calibration — tuned to your tub
+        <Icon name="target" size={18} className="mr-1.5 inline align-[-3px] text-brand-600" />
+        Calibration — tuned to your tub
       </h2>
 
       {suggestions.length === 0 ? (
