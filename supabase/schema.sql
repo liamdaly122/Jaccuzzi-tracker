@@ -71,6 +71,33 @@ alter table spa_settings
 alter table test_readings add column if not exists orp_mv numeric(6, 1);
 
 -- -----------------------------------------------------------------------------
+-- probe_readings: automatic history from an iopool probe (pH / ORP / temp).
+--
+-- Separate from test_readings on purpose: the probe cannot measure total
+-- alkalinity, and test_readings.total_alkalinity_ppm is NOT NULL, so probe data
+-- would either be rejected or force us to invent a number. It gets its own home.
+--
+-- The unique index on measured_at is the dedupe strategy: capture is
+-- "on conflict do nothing", so polling an unchanged measurement is a no-op.
+-- That also bounds growth to the probe's own cadence (~96 rows/day maximum),
+-- and the daily cron prunes anything older than 180 days.
+-- -----------------------------------------------------------------------------
+create table if not exists probe_readings (
+  id bigint generated always as identity primary key,
+  measured_at timestamptz not null,
+  ph numeric(4, 2),
+  orp_mv numeric(6, 1),
+  temperature_c numeric(4, 1),
+  is_valid boolean not null default true,
+  created_at timestamptz not null default now()
+);
+
+create unique index if not exists probe_readings_measured_at_key
+  on probe_readings (measured_at);
+create index if not exists probe_readings_recent_idx
+  on probe_readings (measured_at desc);
+
+-- -----------------------------------------------------------------------------
 -- test_readings: each time you test your water with a strip.
 -- -----------------------------------------------------------------------------
 create table if not exists test_readings (

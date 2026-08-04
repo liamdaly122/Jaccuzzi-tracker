@@ -18,6 +18,7 @@ import type {
   DosingLogRow,
   NotificationLogRow,
   UsageLogRow,
+  ProbeReadingRow,
 } from "./types";
 
 // Fetch the single settings row (id = 1). Throws with a friendly message if the
@@ -138,6 +139,91 @@ export async function getLastNotification(): Promise<NotificationLogRow | null> 
     .maybeSingle();
   if (error) return null; // non-critical; don't break the dashboard
   return (data as NotificationLogRow) ?? null;
+}
+
+// =============================================================================
+//  Probe history (iopool). Kept in its own table because the probe can't measure
+//  alkalinity and test_readings requires it — see supabase/schema.sql.
+// =============================================================================
+
+// Keep six months. Plenty for the 90-day water cycle and the drift analysis,
+// and it caps the table permanently instead of letting it creep upward.
+export const PROBE_RETENTION_DAYS = 180;
+
+// Best-effort: a logging failure must never break a page render or the cron.
+// The unique index on measured_at makes repeat captures silent no-ops.
+export async function captureProbeReading(measure: {
+  measuredAt: string | null;
+  ph: number | null;
+  orpMv: number | null;
+  temperatureC: number | null;
+  isValid: boolean;
+}): Promise<boolean> {
+  if (!measure.measuredAt) return false;
+  try {
+    const supabase = getSupabase();
+    const { error } = await supabase
+      .from("probe_readings")
+      .upsert(
+        {
+          measured_at: measure.measuredAt,
+          ph: measure.ph,
+          orp_mv: measure.orpMv,
+          temperature_c: measure.temperatureC,
+          is_valid: measure.isValid,
+        },
+        { onConflict: "measured_at", ignoreDuplicates: true },
+      );
+    return !error;
+  } catch {
+    return false;
+  }
+}
+
+export async function getRecentProbeReadings(limit = 500): Promise<ProbeReadingRow[]> {
+  const supabase = getSupabase();
+  const { data, error } = await supabase
+    .from("probe_readings")
+    .select("*")
+    .order("measured_at", { ascending: false })
+    .limit(limit);
+  if (error) throw new Error(`Could not load probe history: ${error.message}`);
+  return (data ?? []) as ProbeReadingRow[];
+}
+
+export async function getProbeReadingsSince(
+  sinceIso: string | null,
+  limit = 1000,
+): Promise<ProbeReadingRow[]> {
+  const supabase = getSupabase();
+  let query = supabase.from("probe_readings").select("*");
+  if (sinceIso) query = query.gte("measured_at", sinceIso);
+  const { data, error } = await query
+    .order("measured_at", { ascending: false })
+    .limit(limit);
+  if (error) throw new Error(`Could not load probe history: ${error.message}`);
+  return (data ?? []) as ProbeReadingRow[];
+}
+
+// Called once a day by the cron so storage stays bounded rather than growing.
+export async function pruneProbeReadings(
+  retentionDays = PROBE_RETENTION_DAYS,
+): Promise<number> {
+  try {
+    const cutoff = new Date(
+      Date.now() - retentionDays * 24 * 60 * 60 * 1000,
+    ).toISOString();
+    const supabase = getSupabase();
+    const { data, error } = await supabase
+      .from("probe_readings")
+      .delete()
+      .lt("measured_at", cutoff)
+      .select("id");
+    if (error) return 0;
+    return (data ?? []).length;
+  } catch {
+    return 0;
+  }
 }
 
 // Map a MaintenanceTaskRow into the camelCase shape the pure task helpers use.

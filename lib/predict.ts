@@ -166,10 +166,13 @@ function forecastMetric(spec: MetricSpec): Forecast | null {
 
 export interface ForecastReading {
   recorded_at: string;
-  ph: number | string;
+  // Nullable because probe history supplies pH but no alkalinity, and a strip
+  // may skip a metric. Every metric is read through `num()` below, which already
+  // treats null as "no point" and drops it from the fit.
+  ph: number | string | null;
   free_chlorine_ppm: number | string | null;
   bromine_ppm: number | string | null;
-  total_alkalinity_ppm: number | string;
+  total_alkalinity_ppm: number | string | null;
 }
 
 // Build the set of forecasts worth showing, across pH, the active sanitizer,

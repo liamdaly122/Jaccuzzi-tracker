@@ -80,6 +80,16 @@ export interface NotificationLogRow {
   created_at: string;
 }
 
+export interface ProbeReadingRow {
+  id: number;
+  measured_at: string;
+  ph: number | null;
+  orp_mv: number | null;
+  temperature_c: number | null;
+  is_valid: boolean;
+  created_at: string;
+}
+
 export interface UsageLogRow {
   id: number;
   used_at: string;
