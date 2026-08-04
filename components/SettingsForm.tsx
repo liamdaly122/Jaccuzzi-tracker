@@ -308,10 +308,26 @@ export default function SettingsForm({ settings, icsUrl }: Props) {
         </h2>
         {icsUrl ? (
           <>
-            <p className="mb-2 text-sm text-slate-600">
-              Subscribe to this link in Google, Apple, or Outlook calendar to see
-              your maintenance dates there too. (Calendar apps refresh on their
-              own schedule, so this is a backup to the phone notifications.)
+            <p className="mb-3 text-sm text-slate-600">
+              Adds your maintenance dates to the calendar app on your phone or
+              computer. (Calendar apps refresh on their own slow schedule, so
+              treat this as a bonus — the phone notifications are the reliable
+              reminder.)
+            </p>
+
+            {/* The one-tap route. A plain https link just downloads a file;
+                webcal:// is what actually opens the "subscribe" flow. */}
+            <a
+              href={icsUrl.replace(/^https?:\/\//, "webcal://")}
+              className="mb-3 flex w-full items-center justify-center gap-2 rounded-xl bg-brand-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-brand-700"
+            >
+              <Icon name="calendar" size={18} />
+              Add to my calendar
+            </a>
+
+            <p className="mb-1.5 text-xs font-medium text-slate-500">
+              Didn&apos;t work, or using Google Calendar on a computer? Copy this
+              link and use <em>Subscribe from URL</em>:
             </p>
             <div className="flex items-center gap-2">
               <input
@@ -330,7 +346,34 @@ export default function SettingsForm({ settings, icsUrl }: Props) {
                 {copied ? "Copied!" : "Copy"}
               </button>
             </div>
-            <p className="mt-2 text-xs text-slate-400">
+            <details className="mt-3 text-xs text-slate-500">
+              <summary className="cursor-pointer font-medium text-brand-600">
+                Step-by-step for each calendar app
+              </summary>
+              <ul className="mt-2 space-y-1.5 pl-4">
+                <li className="list-disc">
+                  <strong>iPhone / iPad:</strong> tap <em>Add to my calendar</em>{" "}
+                  above, then <em>Subscribe</em> when Calendar opens.
+                </li>
+                <li className="list-disc">
+                  <strong>Android:</strong> the button works if you have a
+                  calendar app that handles subscriptions. Otherwise use the
+                  Google Calendar route below on a computer — Google doesn&apos;t
+                  let you add a subscription from the phone app.
+                </li>
+                <li className="list-disc">
+                  <strong>Google Calendar (computer):</strong> copy the link,
+                  then in Google Calendar go to <em>Other calendars</em> →{" "}
+                  <strong>+</strong> → <em>From URL</em> and paste it.
+                </li>
+                <li className="list-disc">
+                  <strong>Outlook:</strong> <em>Add calendar</em> →{" "}
+                  <em>Subscribe from web</em> and paste the link.
+                </li>
+              </ul>
+            </details>
+
+            <p className="mt-3 text-xs text-slate-400">
               Keep this link private — anyone with it can see your schedule.
             </p>
           </>

@@ -27,7 +27,9 @@ export function isIopoolConfigured(): boolean {
   return Boolean(process.env.IOPOOL_API_KEY);
 }
 
-export async function getIopoolReading(): Promise<IopoolResult> {
+export async function getIopoolReading(
+  opts: { fresh?: boolean } = {},
+): Promise<IopoolResult> {
   const key = process.env.IOPOOL_API_KEY;
   if (!key) {
     return { ok: false, error: "Your iopool probe isn't connected yet." };
@@ -39,9 +41,11 @@ export async function getIopoolReading(): Promise<IopoolResult> {
     const res = await fetch(ENDPOINT, {
       headers: { "x-api-key": key },
       signal: controller.signal,
-      // The probe uploads every few minutes; a short cache keeps the dashboard
-      // snappy without hammering iopool on every page load.
-      next: { revalidate: 120 },
+      // The probe uploads every few minutes, so a short cache keeps the
+      // dashboard snappy. The refresh button bypasses it for a live read.
+      ...(opts.fresh
+        ? { cache: "no-store" as const }
+        : { next: { revalidate: 120 } }),
     });
 
     if (!res.ok) {
