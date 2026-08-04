@@ -13,11 +13,19 @@ import {
   getRecentReadings,
   getLastNotification,
   getBathersSince,
+  getRecentDosing,
   toTaskLike,
 } from "@/lib/data";
 import { computeNextDue } from "@/lib/tasks";
 import { calculateRecommendations } from "@/lib/chemistry";
-import { computeWaterChangeIntervalDays, daysSince, usageWaterStatus } from "@/lib/water";
+import {
+  computeWaterChangeIntervalDays,
+  daysSince,
+  usageWaterStatus,
+  sanitiserDemandTrend,
+  waterChangeVerdict,
+  estimateRefillCost,
+} from "@/lib/water";
 import { buildForecasts } from "@/lib/predict";
 import { getForecast, weatherAdvice, type WeatherForecast } from "@/lib/weather";
 import {
@@ -62,6 +70,7 @@ export default async function DashboardPage() {
           latest.calcium_hardness_ppm === null
             ? null
             : Number(latest.calcium_hardness_ppm),
+        orpMv: latest.orp_mv === null ? null : Number(latest.orp_mv),
         isFreshFill: latest.is_fresh_fill,
       },
       config,
@@ -98,6 +107,31 @@ export default async function DashboardPage() {
   const usageStatus = usageAvailable
     ? usageWaterStatus(config.volumeLitres, cumulativeBathers as number)
     : null;
+
+  // Chemical-demand trend: is the water making us work harder than it was?
+  let demand = null;
+  try {
+    demand = sanitiserDemandTrend(await getRecentDosing(60), now);
+  } catch {
+    demand = null;
+  }
+
+  // Persistent low ORP with pH in range means the sanitiser can't work any
+  // more — a stronger "change it" signal than any calendar.
+  const sanitiserIneffective = Boolean(
+    calc?.safetyFlags.some((f) => f.code === "sanitizer_ineffective") &&
+      latest &&
+      Number(latest.ph) <= config.targetRanges.phIdealMax,
+  );
+
+  const verdict = waterChangeVerdict({
+    ageDays: waterAgeDays,
+    intervalDays: waterChange.intervalDays,
+    usage: usageStatus,
+    demand,
+    sanitiserIneffective,
+  });
+  const refillCost = estimateRefillCost(config.volumeLitres);
 
   // Weather (only when a location is set; fetch failures just hide the card).
   let weather: WeatherForecast | null = null;
@@ -192,14 +226,20 @@ export default async function DashboardPage() {
             <dl className="mt-3 grid grid-cols-3 gap-2 text-center">
               <Metric label="pH" value={latest.ph} />
               <Metric label="Alkalinity" value={latest.total_alkalinity_ppm} />
-              <Metric
-                label={config.sanitizerType === "chlorine" ? "Chlorine" : "Bromine"}
-                value={
-                  config.sanitizerType === "chlorine"
-                    ? latest.free_chlorine_ppm
-                    : latest.bromine_ppm
-                }
-              />
+              {config.sanitizerUnit === "orp" && latest.orp_mv !== null ? (
+                <Metric label="ORP (mV)" value={latest.orp_mv} />
+              ) : (
+                <Metric
+                  label={
+                    config.sanitizerType === "chlorine" ? "Chlorine" : "Bromine"
+                  }
+                  value={
+                    config.sanitizerType === "chlorine"
+                      ? latest.free_chlorine_ppm
+                      : latest.bromine_ppm
+                  }
+                />
+              )}
             </dl>
             <p className="mt-3 text-xs text-slate-400">
               Last tested {formatDateTime(latest.recorded_at)}
@@ -227,7 +267,34 @@ export default async function DashboardPage() {
 
       {/* Water freshness (smart drain & refill) */}
       <Card>
-        <h2 className="mb-1 font-semibold text-slate-800">Water freshness</h2>
+        <h2 className="mb-2 font-semibold text-slate-800">Water freshness</h2>
+
+        {/* The headline verdict, weighing every signal we have. */}
+        <div
+          className={`mb-3 rounded-xl p-3 ${
+            verdict.status === "change_now"
+              ? "bg-red-50 text-red-800"
+              : verdict.status === "change_soon"
+                ? "bg-amber-50 text-amber-900"
+                : verdict.status === "watch"
+                  ? "bg-slate-50 text-slate-700"
+                  : "bg-emerald-50 text-emerald-800"
+          }`}
+        >
+          <p className="flex items-center gap-2 font-semibold">
+            <Icon
+              name={
+                verdict.status === "change_now" ||
+                verdict.status === "change_soon"
+                  ? "alert-triangle"
+                  : "check-circle"
+              }
+              size={17}
+            />
+            {verdict.headline}
+          </p>
+          <p className="mt-1 text-sm">{verdict.detail}</p>
+        </div>
 
         {usageStatus ? (
           <div className="mb-3">
@@ -281,6 +348,14 @@ export default async function DashboardPage() {
           <div className="mt-3">
             <LogSoakButton />
           </div>
+        ) : null}
+
+        {verdict.status === "fresh" || verdict.status === "ok" ? (
+          <p className="mt-2 text-xs text-slate-500">
+            A full refill is about {refillCost.kwh} kWh of heating plus the
+            water itself (roughly £{refillCost.totalCost.toFixed(2)}), so it&apos;s
+            worth changing on the numbers rather than out of habit.
+          </p>
         ) : null}
 
         <p className="mt-2 text-xs text-slate-400">

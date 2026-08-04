@@ -16,6 +16,7 @@ export default async function NewReadingPage() {
           sanitizerType={config.sanitizerType}
           targetRanges={config.targetRanges}
           scanEnabled={isScanConfigured()}
+          sanitizerUnit={config.sanitizerUnit}
         />
       </div>
     );

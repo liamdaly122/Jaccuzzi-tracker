@@ -44,6 +44,7 @@ export function toSpaConfig(settings: SpaSettings): SpaConfig {
   return {
     volumeLitres: Number(settings.volume_litres),
     sanitizerType: settings.sanitizer_type,
+    sanitizerUnit: settings.sanitizer_unit ?? "ppm",
     targetRanges: { ...DEFAULT_TARGET_RANGES, ...(settings.target_ranges ?? {}) },
     dosingConstants: {
       ...DEFAULT_DOSING_CONSTANTS,

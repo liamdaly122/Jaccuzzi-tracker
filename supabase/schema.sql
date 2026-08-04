@@ -63,6 +63,13 @@ alter table spa_settings add column if not exists latitude numeric(8, 4);
 alter table spa_settings add column if not exists longitude numeric(8, 4);
 alter table spa_settings add column if not exists location_name text;
 
+-- Sanitiser measurement unit: 'ppm' (test strips) or 'orp' (a probe, in mV).
+alter table spa_settings
+  add column if not exists sanitizer_unit text not null default 'ppm';
+
+-- ORP / disinfection potential in millivolts, for probe users.
+alter table test_readings add column if not exists orp_mv numeric(6, 1);
+
 -- -----------------------------------------------------------------------------
 -- test_readings: each time you test your water with a strip.
 -- -----------------------------------------------------------------------------

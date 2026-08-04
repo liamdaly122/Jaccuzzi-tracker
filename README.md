@@ -239,9 +239,21 @@ This uses a free service with no key needed.
 - **Calibration (in Settings):** as you log tests and doses, the app quietly
   learns how *your* tub actually responds and offers a one-tap tweak so future
   dose suggestions get more accurate.
-- **Settings:** switch between chlorine/bromine, set your water volume and how
-  many people use it on an average day, set your location for weather warnings,
-  and fine-tune targets if your product label differs.
+- **Water freshness:** the app weighs how old the water is, how many
+  person-soaks it's had, and whether you're using **more sanitiser than you
+  were a fortnight ago** — that last one is the water telling you it's tiring,
+  usually before the calendar does. It also shows what a refill costs to heat,
+  so you change it on the numbers rather than out of habit.
+- **Test strips or a probe:** in Settings you can switch between **ppm** (test
+  strips) and **ORP** (a probe such as an iopool, measured in millivolts). ORP
+  measures whether your sanitiser is actually *working*, which is the better
+  signal. The two can't be converted into one another, so in ORP mode the app
+  tells you if the water is sanitising and guides a gradual top-up instead of
+  inventing an exact gram figure — enter a ppm alongside it any time you want
+  exact doses back.
+- **Settings:** switch between chlorine/bromine, choose ppm or ORP, set your
+  water volume and how many people use it on an average day, set your location
+  for weather warnings, and fine-tune targets if your product label differs.
 
 ---
 

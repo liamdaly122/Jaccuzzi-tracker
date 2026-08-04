@@ -6,16 +6,18 @@
 
 import type {
   SanitizerType,
+  SanitizerUnit,
   TargetRanges,
   DosingConstants,
 } from "./chemistry";
 import type { TaskType } from "./tasks";
 
-export type { SanitizerType, TargetRanges, DosingConstants, TaskType };
+export type { SanitizerType, SanitizerUnit, TargetRanges, DosingConstants, TaskType };
 
 export interface SpaSettings {
   id: number;
   sanitizer_type: SanitizerType;
+  sanitizer_unit: SanitizerUnit;
   volume_litres: number;
   target_ranges: TargetRanges;
   dosing_constants: DosingConstants;
@@ -34,6 +36,7 @@ export interface TestReadingRow {
   bromine_ppm: number | null;
   total_alkalinity_ppm: number;
   calcium_hardness_ppm: number | null;
+  orp_mv: number | null;
   is_fresh_fill: boolean;
   notes: string | null;
   created_at: string;

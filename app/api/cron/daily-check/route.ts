@@ -7,12 +7,13 @@ import {
   getLatestReading,
   getRecentReadings,
   getBathersSince,
+  getRecentDosing,
   toTaskLike,
 } from "@/lib/data";
 import { computeNextDue } from "@/lib/tasks";
 import { calculateRecommendations } from "@/lib/chemistry";
 import { buildForecasts } from "@/lib/predict";
-import { usageWaterStatus } from "@/lib/water";
+import { usageWaterStatus, sanitiserDemandTrend } from "@/lib/water";
 import { getForecast, weatherAdvice } from "@/lib/weather";
 import { sendNtfy } from "@/lib/ntfy";
 
@@ -69,6 +70,7 @@ async function handle(request: NextRequest) {
             latest.calcium_hardness_ppm === null
               ? null
               : Number(latest.calcium_hardness_ppm),
+          orpMv: latest.orp_mv === null ? null : Number(latest.orp_mv),
           isFreshFill: latest.is_fresh_fill,
         },
         config,
@@ -100,6 +102,17 @@ async function handle(request: NextRequest) {
       }
     } catch {
       // usage_log table not set up yet — skip silently.
+    }
+
+    // The water asking for more chemical than it used to — an early warning
+    // that it's tiring, well before the calendar says so.
+    try {
+      const trend = sanitiserDemandTrend(await getRecentDosing(60), now);
+      if (trend.rising && !usageAlert) {
+        usageAlert = `Sanitiser use up ~${Math.round((trend.changeRatio ?? 0) * 100)}% vs a fortnight ago — water may be tiring`;
+      }
+    } catch {
+      // dosing history unavailable — skip.
     }
 
     // Weather advisories (frost/heat) if a location is set.

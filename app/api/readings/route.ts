@@ -42,6 +42,7 @@ export async function POST(request: NextRequest) {
         brominePpm: r.brominePpm,
         totalAlkalinityPpm: r.totalAlkalinityPpm,
         calciumHardnessPpm: r.calciumHardnessPpm,
+        orpMv: r.orpMv,
         isFreshFill: r.isFreshFill,
       },
       config,
@@ -57,6 +58,7 @@ export async function POST(request: NextRequest) {
         bromine_ppm: r.brominePpm,
         total_alkalinity_ppm: r.totalAlkalinityPpm,
         calcium_hardness_ppm: r.calciumHardnessPpm,
+        orp_mv: r.orpMv,
         is_fresh_fill: r.isFreshFill,
         notes: r.notes ?? null,
       })

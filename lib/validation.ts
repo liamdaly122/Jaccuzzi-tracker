@@ -17,6 +17,7 @@ export const readingSchema = z.object({
   brominePpm: optionalNumber,
   totalAlkalinityPpm: z.number().min(0).max(1000),
   calciumHardnessPpm: optionalNumber,
+  orpMv: optionalNumber,
   isFreshFill: z.boolean().optional().default(false),
   notes: z.string().max(2000).optional().nullable(),
   recordedAt: z.string().datetime().optional(),
@@ -54,6 +55,9 @@ const targetRangesSchema = z.object({
   brMax: z.number(),
   chMin: z.number(),
   chMax: z.number(),
+  orpMin: z.number().optional(),
+  orpMax: z.number().optional(),
+  orpDangerHigh: z.number().optional(),
 });
 
 const dosingConstantsSchema = z.object({
@@ -73,6 +77,7 @@ const dosingConstantsSchema = z.object({
 
 export const settingsSchema = z.object({
   sanitizerType: z.enum(["chlorine", "bromine"]),
+  sanitizerUnit: z.enum(["ppm", "orp"]).optional(),
   volumeLitres: z.number().positive().max(100000),
   avgDailyBathers: z.number().min(0).max(100),
   targetRanges: targetRangesSchema,

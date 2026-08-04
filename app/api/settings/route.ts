@@ -30,6 +30,9 @@ export async function PUT(request: NextRequest) {
 
   const update: Record<string, unknown> = {
     sanitizer_type: parsed.data.sanitizerType,
+    ...(parsed.data.sanitizerUnit
+      ? { sanitizer_unit: parsed.data.sanitizerUnit }
+      : {}),
     volume_litres: parsed.data.volumeLitres,
     avg_daily_bathers: parsed.data.avgDailyBathers,
     target_ranges: parsed.data.targetRanges,

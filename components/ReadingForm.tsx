@@ -2,7 +2,12 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import type { CalculationResult, SanitizerType, TargetRanges } from "@/lib/chemistry";
+import type {
+  CalculationResult,
+  SanitizerType,
+  SanitizerUnit,
+  TargetRanges,
+} from "@/lib/chemistry";
 import { Button, Card, Field, inputClass } from "./ui";
 import RecommendationList from "./RecommendationList";
 import ScanStripButton from "./ScanStripButton";
@@ -11,6 +16,7 @@ interface Props {
   sanitizerType: SanitizerType;
   targetRanges: TargetRanges;
   scanEnabled?: boolean;
+  sanitizerUnit?: SanitizerUnit;
 }
 
 // A test-strip usually gives colour bands, so we present the ideal band next to
@@ -19,12 +25,15 @@ export default function ReadingForm({
   sanitizerType,
   targetRanges,
   scanEnabled = false,
+  sanitizerUnit = "ppm",
 }: Props) {
+  const orpMode = sanitizerUnit === "orp";
   const router = useRouter();
   const [ph, setPh] = useState("");
   const [ta, setTa] = useState("");
   const [sanitizer, setSanitizer] = useState("");
   const [calcium, setCalcium] = useState("");
+  const [orp, setOrp] = useState("");
   const [isFreshFill, setIsFreshFill] = useState(false);
   const [notes, setNotes] = useState("");
 
@@ -54,6 +63,7 @@ export default function ReadingForm({
       freeChlorinePpm: sanitizerType === "chlorine" ? num(sanitizer) : null,
       brominePpm: sanitizerType === "bromine" ? num(sanitizer) : null,
       calciumHardnessPpm: num(calcium),
+      orpMv: num(orp),
       isFreshFill,
       notes: notes.trim() || null,
     };
@@ -86,6 +96,7 @@ export default function ReadingForm({
     setTa("");
     setSanitizer("");
     setCalcium("");
+    setOrp("");
     setIsFreshFill(false);
     setNotes("");
   }
@@ -178,7 +189,30 @@ export default function ReadingForm({
             />
           </Field>
 
-          <Field label={`${sanitizerLabel} (ppm)`} hint={`Aim for ${sanitizerRange}`}>
+          {orpMode ? (
+            <Field
+              label="ORP / disinfection potential (mV)"
+              hint={`Aim for ${targetRanges.orpMin ?? 650}–${targetRanges.orpMax ?? 750} mV. This is your probe's main reading.`}
+            >
+              <input
+                type="number"
+                inputMode="decimal"
+                value={orp}
+                onChange={(e) => setOrp(e.target.value)}
+                className={inputClass}
+                placeholder="e.g. 700"
+              />
+            </Field>
+          ) : null}
+
+          <Field
+            label={`${sanitizerLabel} (ppm)${orpMode ? " — optional" : ""}`}
+            hint={
+              orpMode
+                ? "Only if you also did a strip. Adding it lets me work out an exact dose."
+                : `Aim for ${sanitizerRange}`
+            }
+          >
             <input
               type="number"
               inputMode="decimal"

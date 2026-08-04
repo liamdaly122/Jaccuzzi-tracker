@@ -57,6 +57,9 @@ export default function SettingsForm({ settings, icsUrl }: Props) {
     settings.dosing_constants,
   );
   const [location, setLocation] = useState(settings.location_name ?? "");
+  const [sanitizerUnit, setSanitizerUnit] = useState(
+    settings.sanitizer_unit ?? "ppm",
+  );
   const [status, setStatus] = useState<"idle" | "saving" | "saved" | "error">(
     "idle",
   );
@@ -71,6 +74,7 @@ export default function SettingsForm({ settings, icsUrl }: Props) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         sanitizerType,
+        sanitizerUnit,
         volumeLitres: Number(volume),
         avgDailyBathers: Number(bathers),
         targetRanges: ranges,
@@ -116,6 +120,53 @@ export default function SettingsForm({ settings, icsUrl }: Props) {
             </button>
           ))}
         </div>
+      </Card>
+
+      {/* How the sanitiser is measured */}
+      <Card>
+        <h2 className="mb-1 font-semibold text-slate-800">
+          How do you measure it?
+        </h2>
+        <p className="mb-3 text-sm text-slate-500">
+          Test strips read the <strong>amount</strong> of sanitiser. A probe
+          (like an iopool) reads <strong>ORP</strong> — how hard the water is
+          actually sanitising, which is the better measure of whether it&apos;s
+          working.
+        </p>
+        <div className="grid grid-cols-2 gap-2">
+          {(
+            [
+              { key: "ppm", label: "Test strips", sub: "ppm" },
+              { key: "orp", label: "Probe", sub: "ORP / mV" },
+            ] as const
+          ).map((opt) => (
+            <button
+              key={opt.key}
+              onClick={() => setSanitizerUnit(opt.key)}
+              className={`rounded-xl border-2 p-3 text-center transition ${
+                sanitizerUnit === opt.key
+                  ? "border-brand-500 bg-brand-50 text-brand-700"
+                  : "border-slate-200 text-slate-500"
+              }`}
+            >
+              <span className="flex items-center justify-center gap-1.5 font-medium">
+                <Icon name={opt.key === "ppm" ? "flask" : "bolt"} size={18} />
+                {opt.label}
+              </span>
+              <span className="mt-0.5 block text-xs opacity-70">{opt.sub}</span>
+            </button>
+          ))}
+        </div>
+        {sanitizerUnit === "orp" ? (
+          <p className="mt-3 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600">
+            ORP and ppm can&apos;t be converted into each other — the same ppm
+            reads different mV depending on pH, stabiliser and temperature. So
+            in ORP mode I&apos;ll tell you whether your sanitiser is working and
+            guide you to top up gradually, rather than inventing an exact gram
+            figure. Enter a ppm too whenever you have one and you&apos;ll get
+            exact doses back.
+          </p>
+        ) : null}
       </Card>
 
       {/* Volume */}
