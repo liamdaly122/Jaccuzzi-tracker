@@ -14,9 +14,13 @@
 --  duplicate your data.
 --
 --  Security note: This app only ever talks to the database from the server
---  using the secret "service_role" key, so Row Level Security is intentionally
---  left off. The browser never gets a database key. Do not paste your
---  service_role key anywhere public.
+--  using the secret "service_role" key, and the browser never gets a database
+--  key. Even so, Row Level Security IS enabled on every table (see the bottom
+--  of this file) — Supabase exposes the public schema over the internet via
+--  PostgREST, and the "anon" key is publishable by design, so without RLS
+--  anyone holding it could read or change everything. service_role bypasses
+--  RLS, so this locks out everyone else while leaving the app untouched.
+--  Do not paste your service_role key anywhere public.
 -- =============================================================================
 
 -- -----------------------------------------------------------------------------
@@ -232,3 +236,35 @@ begin
   return found;
 end;
 $$;
+
+-- =============================================================================
+--  Row Level Security — lock the public API
+--
+--  Supabase serves the "public" schema over the internet through PostgREST. The
+--  "anon" key is designed to be publishable, and Supabase's own guidance is
+--  that it's only safe to expose BECAUSE RLS is assumed to be on. With RLS off,
+--  anyone holding that key could read — and write — every row here.
+--
+--  This app talks to the database exclusively with the "service_role" key,
+--  which BYPASSES RLS. So enabling RLS with no policies at all costs the app
+--  nothing and shuts the public door completely: server keeps full access,
+--  everyone else gets nothing.
+--
+--  Safe to re-run: enabling RLS on a table that already has it is a no-op.
+-- =============================================================================
+alter table spa_settings       enable row level security;
+alter table test_readings      enable row level security;
+alter table dosing_log         enable row level security;
+alter table maintenance_tasks  enable row level security;
+alter table task_completions   enable row level security;
+alter table notification_log   enable row level security;
+alter table usage_log          enable row level security;
+alter table probe_readings     enable row level security;
+
+-- Deliberately no policies: no policy means no access for anon/authenticated,
+-- which is exactly what we want. service_role is unaffected.
+
+-- Belt and braces: these helpers run as their caller, so RLS above already
+-- covers them, but there's no reason for the public roles to hold execute.
+revoke execute on function complete_task(bigint, text) from anon, authenticated;
+revoke execute on function try_log_notification(date, text, text) from anon, authenticated;
