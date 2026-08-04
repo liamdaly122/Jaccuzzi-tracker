@@ -6,6 +6,7 @@ import LogSoakButton from "@/components/LogSoakButton";
 import { Badge, Card, LinkButton } from "@/components/ui";
 import Icon from "@/components/Icon";
 import ProbeCard from "@/components/ProbeCard";
+import QuickLinks from "@/components/QuickLinks";
 import {
   getSettings,
   toSpaConfig,
@@ -258,7 +259,9 @@ export default async function DashboardPage() {
       {/* Water status */}
       <Card>
         <div className="mb-2 flex items-center justify-between">
-          <h2 className="font-semibold text-slate-800">Water</h2>
+          <h2 className="font-semibold text-slate-800">
+            {probe ? "Last saved test" : "Water"}
+          </h2>
           <Badge tone={config.sanitizerType === "chlorine" ? "blue" : "green"}>
             {config.sanitizerType === "chlorine" ? "Chlorine" : "Bromine"}
           </Badge>
@@ -406,6 +409,41 @@ export default async function DashboardPage() {
         </p>
       </Card>
 
+      {/* Coming up */}
+      <Card>
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="font-semibold text-slate-800">Coming up</h2>
+          <Link href="/tasks" className="text-sm font-medium text-brand-600">
+            All tasks →
+          </Link>
+        </div>
+        {dueTasks.length === 0 ? (
+          <p className="text-sm text-slate-500">
+            Nothing due right now. You&apos;re all caught up.
+          </p>
+        ) : (
+          <ul className="space-y-2">
+            {dueTasks.map(({ row, info }) => (
+              <li
+                key={row.id}
+                className="flex items-center justify-between gap-3 rounded-xl border border-slate-100 p-3"
+              >
+                <div className="flex items-center gap-3">
+                  <Icon name={taskTypeIcons[row.task_type]} size={22} className="text-brand-600" />
+                  <div>
+                    <p className="text-sm font-medium text-slate-800">{row.name}</p>
+                    <Badge tone={dueStatusTone(info.status)}>
+                      {dueStatusLabel(info.status, info.daysUntilDue)}
+                    </Badge>
+                  </div>
+                </div>
+                <CompleteButton taskId={row.id} />
+              </li>
+            ))}
+          </ul>
+        )}
+      </Card>
+
       {/* Weather */}
       {weather && weather.days.length > 0 ? (
         <Card>
@@ -458,84 +496,7 @@ export default async function DashboardPage() {
         </Card>
       ) : null}
 
-      {/* Coming up */}
-      <Card>
-        <div className="mb-3 flex items-center justify-between">
-          <h2 className="font-semibold text-slate-800">Coming up</h2>
-          <Link href="/tasks" className="text-sm font-medium text-brand-600">
-            All tasks →
-          </Link>
-        </div>
-        {dueTasks.length === 0 ? (
-          <p className="text-sm text-slate-500">
-            Nothing due right now. You&apos;re all caught up.
-          </p>
-        ) : (
-          <ul className="space-y-2">
-            {dueTasks.map(({ row, info }) => (
-              <li
-                key={row.id}
-                className="flex items-center justify-between gap-3 rounded-xl border border-slate-100 p-3"
-              >
-                <div className="flex items-center gap-3">
-                  <Icon name={taskTypeIcons[row.task_type]} size={22} className="text-brand-600" />
-                  <div>
-                    <p className="text-sm font-medium text-slate-800">{row.name}</p>
-                    <Badge tone={dueStatusTone(info.status)}>
-                      {dueStatusLabel(info.status, info.daysUntilDue)}
-                    </Badge>
-                  </div>
-                </div>
-                <CompleteButton taskId={row.id} />
-              </li>
-            ))}
-          </ul>
-        )}
-      </Card>
-
-      {/* Fresh water setup (compact — the hero version shows when no readings) */}
-      {latest ? (
-        <Card>
-          <Link
-            href="/setup"
-            className="flex items-center justify-between font-medium text-slate-700"
-          >
-            <span className="flex items-center gap-2.5">
-              <Icon name="shower" size={20} className="text-brand-600" />
-              Fresh water setup (new fill? start here)
-            </span>
-            <span className="text-brand-600">→</span>
-          </Link>
-        </Card>
-      ) : null}
-
-      {/* Something wrong? (troubleshooter) */}
-      <Card>
-        <Link
-          href="/troubleshoot"
-          className="flex items-center justify-between font-medium text-slate-700"
-        >
-          <span className="flex items-center gap-2.5">
-              <Icon name="search" size={20} className="text-brand-600" />
-              Something wrong? (cloudy, foamy, green, smelly…)
-            </span>
-          <span className="text-brand-600">→</span>
-        </Link>
-      </Card>
-
-      {/* Guides & help */}
-      <Card>
-        <Link
-          href="/guides"
-          className="flex items-center justify-between font-medium text-slate-700"
-        >
-          <span className="flex items-center gap-2.5">
-              <Icon name="clipboard" size={20} className="text-brand-600" />
-              Guides &amp; help (routines + what chemicals do)
-            </span>
-          <span className="text-brand-600">→</span>
-        </Link>
-      </Card>
+      <QuickLinks />
 
       <p className="text-center text-xs text-slate-400">
         {lastNotification

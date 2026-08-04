@@ -261,6 +261,10 @@ This uses a free service with no key needed.
 - **Calibration (in Settings):** as you log tests and doses, the app quietly
   learns how *your* tub actually responds and offers a one-tap tweak so future
   dose suggestions get more accurate.
+- **Trends:** with an iopool probe connected, the app quietly banks each
+  reading it sees, so the sanitiser-strength (ORP) and temperature charts fill
+  in on their own — no typing. It keeps six months of history and tidies up
+  anything older automatically.
 - **Water freshness:** the app weighs how old the water is, how many
   person-soaks it's had, and whether you're using **more sanitiser than you
   were a fortnight ago** — that last one is the water telling you it's tiring,
