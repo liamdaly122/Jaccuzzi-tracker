@@ -1,4 +1,5 @@
 import SetupNeeded from "@/components/SetupNeeded";
+import Icon from "@/components/Icon";
 import CompleteButton from "@/components/CompleteButton";
 import FrequencyEditor from "@/components/FrequencyEditor";
 import { Badge, Card } from "@/components/ui";
@@ -47,7 +48,7 @@ export default async function TasksPage() {
             <Card key={row.id}>
               <div className="flex items-start justify-between gap-3">
                 <div className="flex items-start gap-3">
-                  <span className="text-2xl">{taskTypeIcons[row.task_type]}</span>
+                  <Icon name={taskTypeIcons[row.task_type]} size={24} className="text-brand-600" />
                   <div>
                     <p className="font-semibold text-slate-800">{row.name}</p>
                     <span className="text-xs text-slate-400">

@@ -360,7 +360,7 @@ export default async function DashboardPage() {
                 className="flex items-center justify-between gap-3 rounded-xl border border-slate-100 p-3"
               >
                 <div className="flex items-center gap-3">
-                  <span className="text-xl">{taskTypeIcons[row.task_type]}</span>
+                  <Icon name={taskTypeIcons[row.task_type]} size={22} className="text-brand-600" />
                   <div>
                     <p className="text-sm font-medium text-slate-800">{row.name}</p>
                     <Badge tone={dueStatusTone(info.status)}>

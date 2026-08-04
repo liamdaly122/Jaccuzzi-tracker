@@ -20,6 +20,7 @@ import { generateOccurrences, type Occurrence } from "@/lib/tasks";
 import { taskTypeHex, taskTypeIcons } from "@/lib/display";
 import { Badge, Card } from "./ui";
 import CompleteButton from "./CompleteButton";
+import Icon from "./Icon";
 
 // Serializable task shape passed from the server page.
 export interface CalendarTask {
@@ -205,7 +206,7 @@ export default function CalendarView({ tasks }: { tasks: CalendarTask[] }) {
                   className="flex items-center justify-between gap-3 rounded-xl border border-slate-100 p-3"
                 >
                   <div className="flex items-center gap-3">
-                    <span className="text-xl">{taskTypeIcons[o.taskType]}</span>
+                    <Icon name={taskTypeIcons[o.taskType]} size={22} className="text-brand-600" />
                     <div>
                       <p className="text-sm font-medium text-slate-800">
                         {o.name}
@@ -269,8 +270,9 @@ export default function CalendarView({ tasks }: { tasks: CalendarTask[] }) {
                   backgroundColor: taskTypeHex[type as keyof typeof taskTypeHex],
                 }}
               />
-              <span className="text-slate-600">
-                {icon} {type}
+              <span className="flex items-center gap-1.5 text-slate-600">
+                <Icon name={icon} size={16} />
+                {type}
               </span>
             </div>
           ))}
