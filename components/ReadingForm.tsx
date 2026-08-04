@@ -11,12 +11,14 @@ import type {
 import { Button, Card, Field, inputClass } from "./ui";
 import RecommendationList from "./RecommendationList";
 import ScanStripButton from "./ScanStripButton";
+import IopoolButton from "./IopoolButton";
 
 interface Props {
   sanitizerType: SanitizerType;
   targetRanges: TargetRanges;
   scanEnabled?: boolean;
   sanitizerUnit?: SanitizerUnit;
+  iopoolEnabled?: boolean;
 }
 
 // A test-strip usually gives colour bands, so we present the ideal band next to
@@ -26,6 +28,7 @@ export default function ReadingForm({
   targetRanges,
   scanEnabled = false,
   sanitizerUnit = "ppm",
+  iopoolEnabled = false,
 }: Props) {
   const orpMode = sanitizerUnit === "orp";
   const router = useRouter();
@@ -135,6 +138,18 @@ export default function ReadingForm({
           Dip your test strip, then type in what it reads. The app will work out
           exactly what to add.
         </p>
+
+        {iopoolEnabled ? (
+          <div className="mb-3">
+            <IopoolButton
+              onValues={(pool) => {
+                const m = pool.measure;
+                if (m.ph != null) setPh(String(m.ph));
+                if (m.orpMv != null) setOrp(String(m.orpMv));
+              }}
+            />
+          </div>
+        ) : null}
 
         {scanEnabled ? (
           <div className="mb-4">

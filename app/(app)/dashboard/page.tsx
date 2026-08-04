@@ -5,6 +5,7 @@ import ApplyIntervalButton from "@/components/ApplyIntervalButton";
 import LogSoakButton from "@/components/LogSoakButton";
 import { Badge, Card, LinkButton } from "@/components/ui";
 import Icon from "@/components/Icon";
+import ProbeCard from "@/components/ProbeCard";
 import {
   getSettings,
   toSpaConfig,
@@ -28,6 +29,8 @@ import {
 } from "@/lib/water";
 import { buildForecasts } from "@/lib/predict";
 import { getForecast, weatherAdvice, type WeatherForecast } from "@/lib/weather";
+import { getIopoolReading, isIopoolConfigured } from "@/lib/iopool";
+import type { IopoolPool } from "@/lib/iopool-parse";
 import {
   dueStatusLabel,
   dueStatusTone,
@@ -133,6 +136,14 @@ export default async function DashboardPage() {
   });
   const refillCost = estimateRefillCost(config.volumeLitres);
 
+  // Live probe reading (hidden entirely when no key is configured, and the
+  // card just disappears if iopool is unreachable).
+  let probe: IopoolPool | null = null;
+  if (isIopoolConfigured()) {
+    const r = await getIopoolReading();
+    if (r.ok) probe = r.pool;
+  }
+
   // Weather (only when a location is set; fetch failures just hide the card).
   let weather: WeatherForecast | null = null;
   if (settings.latitude != null && settings.longitude != null) {
@@ -187,6 +198,8 @@ export default async function DashboardPage() {
           </Card>
         </Link>
       ) : null}
+
+      {probe ? <ProbeCard pool={probe} ranges={config.targetRanges} /> : null}
 
       {/* Predictive heads-up */}
       {forecasts.length > 0 ? (

@@ -13,6 +13,7 @@ import {
 } from "@/lib/startup";
 import { Button, Card } from "./ui";
 import ScanStripButton from "./ScanStripButton";
+import IopoolButton from "./IopoolButton";
 import Icon from "./Icon";
 import PhaseStepper from "./setup/PhaseStepper";
 import WaterBalanceGauge, { type GaugeMetric } from "./setup/WaterBalanceGauge";
@@ -23,6 +24,7 @@ interface Props {
   settings: SpaSettings;
   drainRefillTaskId: number | null;
   scanEnabled: boolean;
+  iopoolEnabled?: boolean;
 }
 
 const STORAGE_KEY = "setup-wizard-v1";
@@ -35,8 +37,10 @@ export default function SetupWizard({
   settings,
   drainRefillTaskId,
   scanEnabled,
+  iopoolEnabled = false,
 }: Props) {
   const router = useRouter();
+  const orpMode = (settings.sanitizer_unit ?? "ppm") === "orp";
 
   const [sanitizer, setSanitizer] = useState<SanitizerType>(
     settings.sanitizer_type,
@@ -49,6 +53,7 @@ export default function SetupWizard({
   const [ph, setPh] = useState("");
   const [ta, setTa] = useState("");
   const [san, setSan] = useState("");
+  const [orp, setOrp] = useState("");
   const [calc, setCalc] = useState<CalculationResult | null>(null);
   const [lastReadingId, setLastReadingId] = useState<number | null>(null);
 
@@ -68,10 +73,17 @@ export default function SetupWizard({
     () => ({
       volumeLitres: Number(volume) || 0,
       sanitizerType: sanitizer,
+      sanitizerUnit: settings.sanitizer_unit ?? "ppm",
       targetRanges: settings.target_ranges,
       dosingConstants: settings.dosing_constants,
     }),
-    [volume, sanitizer, settings.target_ranges, settings.dosing_constants],
+    [
+      volume,
+      sanitizer,
+      settings.sanitizer_unit,
+      settings.target_ranges,
+      settings.dosing_constants,
+    ],
   );
 
   // Hydrate saved progress (survives closing the app during the ~24h wait).
@@ -168,6 +180,7 @@ export default function SetupWizard({
           brominePpm:
             sanitizer === "bromine" && san.trim() !== "" ? Number(san) : null,
           calciumHardnessPpm: null,
+          orpMv: orp.trim() === "" ? null : Number(orp),
           isFreshFill: true,
         }),
       });
@@ -289,6 +302,15 @@ export default function SetupWizard({
   // --- shared test-capture block (used by test + retest actions) -------------
   const testInputs = (
     <div className="space-y-3">
+      {iopoolEnabled ? (
+        <IopoolButton
+          onValues={(pool) => {
+            const m = pool.measure;
+            if (m.ph != null) setPh(String(m.ph));
+            if (m.orpMv != null) setOrp(String(m.orpMv));
+          }}
+        />
+      ) : null}
       {scanEnabled ? (
         <ScanStripButton
           sanitizerType={sanitizer}
@@ -316,6 +338,14 @@ export default function SetupWizard({
           placeholder="3"
         />
       </div>
+      {orpMode ? (
+        <LabelledInput
+          label="ORP (mV)"
+          value={orp}
+          onChange={setOrp}
+          placeholder="700"
+        />
+      ) : null}
     </div>
   );
 
@@ -518,14 +548,15 @@ export default function SetupWizard({
               onClick={async () => {
                 const c = await saveReading();
                 if (!c) return;
+                const sanNum = san.trim() === "" ? null : Number(san);
                 const ok = isSafeToBathe(
                   sanitizer,
                   {
                     ph: Number(ph),
                     totalAlkalinityPpm: Number(ta),
-                    freeChlorinePpm:
-                      sanitizer === "chlorine" ? Number(san) : null,
-                    brominePpm: sanitizer === "bromine" ? Number(san) : null,
+                    freeChlorinePpm: sanitizer === "chlorine" ? sanNum : null,
+                    brominePpm: sanitizer === "bromine" ? sanNum : null,
+                    orpMv: orp.trim() === "" ? null : Number(orp),
                   },
                   config,
                 );

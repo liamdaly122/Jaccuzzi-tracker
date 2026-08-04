@@ -2,6 +2,7 @@ import SetupWizard from "@/components/SetupWizard";
 import SetupNeeded from "@/components/SetupNeeded";
 import { getSettings, getTasks } from "@/lib/data";
 import { isScanConfigured } from "@/lib/gemini";
+import { isIopoolConfigured } from "@/lib/iopool";
 
 export const dynamic = "force-dynamic";
 
@@ -32,6 +33,7 @@ export default async function SetupPage() {
       settings={settings}
       drainRefillTaskId={drainRefillTaskId}
       scanEnabled={isScanConfigured()}
+      iopoolEnabled={isIopoolConfigured()}
     />
   );
 }

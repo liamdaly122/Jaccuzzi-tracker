@@ -53,6 +53,7 @@ what's coming:
 | 5 | `NTFY_TOPIC` | **You invent it.** A private channel name, e.g. `hottub-x7f9q2`. Treat it like a password. |
 | 6 | `ICS_FEED_TOKEN` | **You invent it.** Another keyboard mash, e.g. `k3m8p1w5t9`. Protects your calendar link. |
 | 7 | `GEMINI_API_KEY` | **Optional.** Only for the 📷 photo-scan button. **Copy** a free key from Google AI Studio (see Part E). Skip it and the button just won't show. |
+| 8 | `IOPOOL_API_KEY` | **Optional.** Connects your iopool probe for live pH/ORP/temperature. **Copy** from the iopool app → Settings → bottom of the page (see Part F). |
 
 Keep a note of #1 (`APP_PASSCODE`) and #5 (`NTFY_TOPIC`) — you'll need them on
 your phone. The rest you can forget after setup.
@@ -204,6 +205,27 @@ normal.
 > needs **no card**: just tell me and I'll point it at the current free model.
 > (Advanced: you can also pin a specific model with an optional `GEMINI_MODEL`
 > env var in Vercel, e.g. `gemini-flash-lite-latest`, and redeploy.)
+
+---
+
+## Part F — (Optional) Connect your iopool probe
+
+If you have an **iopool EcO**, the app can read your water live — no dipping,
+no typing.
+
+1. Open the **iopool app** on your phone → **Settings** → scroll to the very
+   bottom → copy your **API key**.
+2. Go to your **Vercel** project → **Settings → Environment Variables**.
+3. Add: Name `IOPOOL_API_KEY`, Value = *(paste the key)*, then **Save**.
+4. Vercel → **Deployments** → open the latest → **⋯ → Redeploy**.
+
+You'll then get a **"Live from your probe"** card at the top of the Today
+screen showing your current pH, ORP and water temperature, and a **"Read my
+iopool probe"** button on the test screen that fills those numbers in for you.
+
+> The probe measures pH, ORP and temperature — **not alkalinity**. So you'll
+> still want a test strip for alkalinity every so often. Pop that number in
+> alongside the probe reading and you'll get exact chemical doses back.
 
 ---
 
