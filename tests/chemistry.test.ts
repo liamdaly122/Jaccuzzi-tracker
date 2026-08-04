@@ -288,3 +288,90 @@ describe("ordering and config injection", () => {
     expect(rec(result, "ph_increaser")).toBeDefined();
   });
 });
+
+// =============================================================================
+//  ORP mode (probe users, e.g. iopool). ORP measures whether the sanitiser is
+//  WORKING, not how much is present, so these tests also pin down that we never
+//  invent a ppm from a millivolt reading.
+// =============================================================================
+describe("ORP sanitiser mode", () => {
+  const orpConfig: SpaConfig = {
+    volumeLitres: 1180,
+    sanitizerType: "chlorine",
+    sanitizerUnit: "orp",
+    targetRanges: DEFAULT_TARGET_RANGES,
+    dosingConstants: DEFAULT_DOSING_CONSTANTS,
+  };
+  const base = { ph: 7.5, totalAlkalinityPpm: 100 };
+
+  it("is happy inside the 650-750 mV band and asks for nothing", () => {
+    const calc = calculateRecommendations({ ...base, orpMv: 700 }, orpConfig);
+    expect(calc.safetyFlags).toHaveLength(0);
+    const sanitiser = calc.recommendations.find((r) => r.order === 3);
+    expect(sanitiser).toBeUndefined();
+  });
+
+  it("flags dangerously high ORP as do-not-use", () => {
+    const calc = calculateRecommendations({ ...base, orpMv: 900 }, orpConfig);
+    expect(calc.safetyFlags.some((f) => f.code === "sanitizer_too_high")).toBe(
+      true,
+    );
+    expect(calc.summary).toContain("Do not use");
+  });
+
+  it("treats a collapsed ORP as unsanitised water", () => {
+    const calc = calculateRecommendations({ ...base, orpMv: 400 }, orpConfig);
+    expect(
+      calc.safetyFlags.some((f) => f.code === "sanitizer_ineffective"),
+    ).toBe(true);
+    // ...and recommends shocking, the ORP equivalent of "sanitizer reads zero".
+    expect(calc.recommendations.some((r) => r.chemical === "mps_shock")).toBe(
+      true,
+    );
+  });
+
+  it("blames high pH first when ORP is low but pH is out of range", () => {
+    const calc = calculateRecommendations(
+      { ph: 8.0, totalAlkalinityPpm: 100, orpMv: 600 },
+      orpConfig,
+    );
+    const sanitiser = calc.recommendations.find((r) => r.order === 3)!;
+    expect(sanitiser.instructions).toMatch(/pH/);
+    expect(sanitiser.instructions).toMatch(/FIRST/);
+  });
+
+  it("NEVER invents a chlorine dose from millivolts alone", () => {
+    const calc = calculateRecommendations({ ...base, orpMv: 600 }, orpConfig);
+    const sanitiser = calc.recommendations.find((r) => r.order === 3)!;
+    // No weighed dose is possible from ORP for stabilised chlorine.
+    expect(sanitiser.amountGrams).toBeNull();
+    expect(sanitiser.instructions).toMatch(/retest/i);
+  });
+
+  it("prefers the exact ppm path when the user supplies both", () => {
+    const calc = calculateRecommendations(
+      { ...base, orpMv: 600, freeChlorinePpm: 1 },
+      orpConfig,
+    );
+    const sanitiser = calc.recommendations.find((r) => r.order === 3)!;
+    // A real concentration means we can weigh a dose again.
+    expect(sanitiser.chemical).toBe("dichlor");
+    expect(sanitiser.amountGrams).toBeGreaterThan(0);
+  });
+
+  it("asks for a reading when the probe value is missing", () => {
+    const calc = calculateRecommendations({ ...base }, orpConfig);
+    const sanitiser = calc.recommendations.find((r) => r.order === 3)!;
+    expect(sanitiser.severity).toBe("info");
+  });
+
+  it("leaves ppm-mode behaviour untouched", () => {
+    const ppmConfig: SpaConfig = { ...orpConfig, sanitizerUnit: "ppm" };
+    const calc = calculateRecommendations(
+      { ...base, freeChlorinePpm: 1 },
+      ppmConfig,
+    );
+    const sanitiser = calc.recommendations.find((r) => r.order === 3)!;
+    expect(sanitiser.amountGrams).toBeGreaterThan(0);
+  });
+});

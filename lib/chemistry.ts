@@ -11,6 +11,17 @@
 
 export type SanitizerType = "chlorine" | "bromine";
 
+// How the user measures sanitiser.
+//   ppm — a test strip / liquid kit reads the CONCENTRATION of sanitiser.
+//   orp — a probe (e.g. iopool) reads OXIDATION-REDUCTION POTENTIAL in mV:
+//         how hard the water is actually oxidising, i.e. whether the sanitiser
+//         is genuinely working.
+// These two are NOT interconvertible. ORP depends on pH, cyanuric acid,
+// temperature and probe calibration, so the same ppm can read wildly different
+// mV. We therefore never derive one from the other — we store whichever the
+// user measured and judge it on its own terms.
+export type SanitizerUnit = "ppm" | "orp";
+
 // Severity drives colour/urgency in the UI. `safety` is the strongest — it
 // means "there is a health reason not to get in the water right now".
 export type Severity = "info" | "low" | "medium" | "high" | "safety";
@@ -28,6 +39,11 @@ export interface TargetRanges {
   brMax: number;
   chMin: number;
   chMax: number;
+  // ORP (mV) — WHO puts the effective-sanitiser floor at 650; 650-750 is the
+  // usual domestic target, and very high readings are harsh on skin and eyes.
+  orpMin: number;
+  orpMax: number;
+  orpDangerHigh: number;
 }
 
 export interface DosingConstants {
@@ -48,6 +64,8 @@ export interface DosingConstants {
 export interface SpaConfig {
   volumeLitres: number;
   sanitizerType: SanitizerType;
+  /** Defaults to "ppm" when absent, so existing settings keep working. */
+  sanitizerUnit?: SanitizerUnit;
   targetRanges: TargetRanges;
   dosingConstants: DosingConstants;
 }
@@ -58,6 +76,8 @@ export interface TestReadingInput {
   brominePpm?: number | null;
   totalAlkalinityPpm: number;
   calciumHardnessPpm?: number | null;
+  /** Millivolts from an ORP probe, when the user has one. */
+  orpMv?: number | null;
   isFreshFill?: boolean;
 }
 
@@ -105,6 +125,9 @@ export const DEFAULT_TARGET_RANGES: TargetRanges = {
   brMax: 5,
   chMin: 100,
   chMax: 250,
+  orpMin: 650,
+  orpMax: 750,
+  orpDangerHigh: 850,
 };
 
 // Default dosing coefficients. Editable in Settings if a product differs.
@@ -264,10 +287,143 @@ function sanitizerStep(
   reading: TestReadingInput,
   config: SpaConfig,
 ): { rec: Recommendation | null; flag: SafetyFlag | null } {
+  // An ORP probe measures effectiveness, not concentration, so it gets its own
+  // branch. If the user also typed a ppm value we prefer the ppm path, because
+  // only a concentration can produce an exact weighed dose.
+  if (config.sanitizerUnit === "orp") {
+    const ppm =
+      config.sanitizerType === "chlorine"
+        ? reading.freeChlorinePpm
+        : reading.brominePpm;
+    if (ppm === null || ppm === undefined) {
+      return orpStep(reading, config);
+    }
+  }
   if (config.sanitizerType === "chlorine") {
     return chlorineStep(reading, config);
   }
   return bromineStep(reading, config);
+}
+
+// -----------------------------------------------------------------------------
+// ORP branch. Deliberately does NOT convert mV to ppm — that relationship
+// depends on pH, stabiliser level, temperature and probe calibration, so any
+// conversion would be a guess dressed up as a number. Instead we judge whether
+// the sanitiser is WORKING, and recommend a measured top-up plus a retest,
+// exactly as we already do for pH (which is likewise non-linear).
+// -----------------------------------------------------------------------------
+function orpStep(
+  reading: TestReadingInput,
+  config: SpaConfig,
+): { rec: Recommendation | null; flag: SafetyFlag | null } {
+  const { orpMin, orpMax, orpDangerHigh, phIdealMin, phIdealMax } =
+    config.targetRanges;
+  const mv = reading.orpMv;
+  const sanitizerName =
+    config.sanitizerType === "chlorine" ? "chlorine" : "bromine";
+  const chemical =
+    config.sanitizerType === "chlorine" ? "dichlor" : "bromine_granules";
+
+  if (mv === null || mv === undefined) {
+    return {
+      rec: {
+        chemical: null,
+        label: "No sanitiser reading",
+        amountGrams: null,
+        instructions:
+          "You didn't enter an ORP reading. Test before getting in — sanitiser is what keeps the water safe.",
+        severity: "info",
+        order: 3,
+      },
+      flag: null,
+    };
+  }
+
+  if (mv > orpDangerHigh) {
+    return {
+      rec: {
+        chemical: null,
+        label: "Sanitiser too strong — do not use",
+        amountGrams: null,
+        instructions:
+          `ORP is very high (${mv} mV, aim for ${orpMin}–${orpMax}). ` +
+          "Do not get in. Leave the cover off and let it fall, or dilute with fresh water, then retest.",
+        severity: "safety",
+        order: 3,
+      },
+      flag: {
+        code: "sanitizer_too_high",
+        message: `ORP is ${mv} mV — too strong to bathe in. Wait for it to fall below ${orpMax} mV.`,
+        severity: "danger",
+      },
+    };
+  }
+
+  if (mv > orpMax) {
+    return {
+      rec: {
+        chemical: null,
+        label: "Sanitiser a little strong",
+        amountGrams: null,
+        instructions:
+          `ORP is ${mv} mV (aim for ${orpMin}–${orpMax}). Hold off adding any more ${sanitizerName} and let it drift down, then retest.`,
+        severity: "low",
+        order: 3,
+      },
+      flag: null,
+    };
+  }
+
+  if (mv < orpMin) {
+    // The classic trap: high pH cripples ORP even when there's plenty of
+    // sanitiser in the water. Say so rather than sending them for more chemical.
+    const phHigh = reading.ph > phIdealMax;
+    const grams = round1(
+      perVolume(config.dosingConstants.bromineTopUpGPer1000L, config.volumeLitres),
+    );
+    const critical = mv < orpMin - 100;
+
+    return {
+      rec: {
+        chemical,
+        label: critical ? "Sanitiser not working" : "Raise sanitiser",
+        amountGrams: config.sanitizerType === "bromine" ? grams : null,
+        instructions: phHigh
+          ? `ORP is low (${mv} mV, aim for ${orpMin}–${orpMax}) and your pH is above ${phIdealMax}. ` +
+            "High pH cripples sanitiser, so fix the pH FIRST and retest — the ORP often recovers on its own without adding anything."
+          : `ORP is low (${mv} mV, aim for ${orpMin}–${orpMax}), so the water isn't sanitising properly. ` +
+            `Add a small amount of ${sanitizerName}, circulate for 20–30 minutes, then retest and repeat if needed. ` +
+            "A probe reads effectiveness rather than dose, so build up gradually rather than adding one big amount. " +
+            DISCLAIMER,
+        severity: critical ? "high" : "medium",
+        order: 3,
+      },
+      flag: critical
+        ? {
+            code: "sanitizer_ineffective",
+            message: `ORP is only ${mv} mV (needs ${orpMin}+). The water is not being sanitised — don't get in until it recovers.`,
+            severity: "danger",
+          }
+        : null,
+    };
+  }
+
+  // In band — but if pH is out, note that the reading will move when pH is fixed.
+  const phOut = reading.ph < phIdealMin || reading.ph > phIdealMax;
+  return {
+    rec: phOut
+      ? {
+          chemical: null,
+          label: "Sanitiser working",
+          amountGrams: null,
+          instructions:
+            `ORP is ${mv} mV, which is in range. Note that fixing your pH will shift this reading, so retest afterwards.`,
+          severity: "info",
+          order: 3,
+        }
+      : null,
+    flag: null,
+  };
 }
 
 function chlorineStep(
@@ -452,7 +608,16 @@ function shockStep(
       ? reading.freeChlorinePpm
       : reading.brominePpm;
 
-  if (active === 0) {
+  // On a probe there is no "zero ppm" to key off, so a badly depressed ORP is
+  // the equivalent signal that the water has no working protection left.
+  const orpCollapsed =
+    config.sanitizerUnit === "orp" &&
+    (active === null || active === undefined) &&
+    reading.orpMv !== null &&
+    reading.orpMv !== undefined &&
+    reading.orpMv < config.targetRanges.orpMin - 100;
+
+  if (active === 0 || orpCollapsed) {
     const grams = round1(
       perVolume(config.dosingConstants.mpsShockGPer1000L, config.volumeLitres),
     );
