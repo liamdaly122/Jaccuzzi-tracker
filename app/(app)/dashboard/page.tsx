@@ -7,6 +7,7 @@ import { Badge, Card, LinkButton } from "@/components/ui";
 import Icon from "@/components/Icon";
 import ProbeCard from "@/components/ProbeCard";
 import QuickLinks from "@/components/QuickLinks";
+import HeaterProtectionCard from "@/components/HeaterProtectionCard";
 import {
   getSettings,
   toSpaConfig,
@@ -31,6 +32,7 @@ import {
   estimateRefillCost,
 } from "@/lib/water";
 import { buildForecasts } from "@/lib/predict";
+import { lsiSnapshot } from "@/lib/balance";
 import { getForecast, weatherAdvice, type WeatherForecast } from "@/lib/weather";
 import { getIopoolReading, isIopoolConfigured } from "@/lib/iopool";
 import { orpDrift } from "@/lib/probe";
@@ -127,15 +129,13 @@ export default async function DashboardPage() {
   // prefer the probe's own history: a sustained ORP decline while pH behaves is
   // the stabiliser-buildup signature. Fall back to the spot reading when there
   // isn't enough history yet.
-  let drift = null;
+  let probeRows: Awaited<ReturnType<typeof getProbeReadingsSince>> = [];
   try {
-    drift = orpDrift(
-      await getProbeReadingsSince(drainTask?.last_completed_at ?? null),
-      config,
-    );
+    probeRows = await getProbeReadingsSince(drainTask?.last_completed_at ?? null);
   } catch {
-    drift = null;
+    probeRows = [];
   }
+  const drift = probeRows.length > 0 ? orpDrift(probeRows, config) : null;
   const sanitiserIneffective =
     drift?.likelyStabiliserBuildup ||
     Boolean(
@@ -164,6 +164,26 @@ export default async function DashboardPage() {
       await captureProbeReading(r.pool.measure);
     }
   }
+
+  // Heater protection. The live probe reading is newer than anything in the
+  // history table, so it goes in front of it as the temperature source.
+  const tempRows = [
+    ...(probe?.measure.measuredAt
+      ? [
+          {
+            measured_at: probe.measure.measuredAt,
+            temperature_c: probe.measure.temperatureC,
+          },
+        ]
+      : []),
+    ...probeRows,
+  ];
+  const balance = lsiSnapshot(
+    recentReadings,
+    tempRows,
+    drainTask?.last_completed_at ?? null,
+    now,
+  );
 
   // Weather (only when a location is set; fetch failures just hide the card).
   let weather: WeatherForecast | null = null;
@@ -310,6 +330,9 @@ export default async function DashboardPage() {
           </Link>
         </div>
       </Card>
+
+      {/* Heater protection — the four numbers judged together, not one by one */}
+      <HeaterProtectionCard snapshot={balance} />
 
       {/* Water freshness (smart drain & refill) */}
       <Card>

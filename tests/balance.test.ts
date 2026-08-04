@@ -5,6 +5,7 @@ import {
   interpretLsi,
   latestCalciumForFill,
   lsiSeries,
+  lsiSnapshot,
   saturationPh,
   temperatureTerm,
   type CalciumReadingLike,
@@ -366,5 +367,96 @@ describe("lsiSeries", () => {
 
   it("copes with an empty history", () => {
     expect(lsiSeries([], [], null)).toEqual([]);
+  });
+});
+
+describe("lsiSnapshot", () => {
+  const test = (
+    ago: number,
+    ph: number | null,
+    ta: number | null,
+    calcium: number | null = null,
+  ) => ({
+    recorded_at: daysAgo(ago),
+    ph,
+    total_alkalinity_ppm: ta,
+    calcium_hardness_ppm: calcium,
+  });
+
+  it("combines the latest test, the fill's calcium and the probe temperature", () => {
+    const snap = lsiSnapshot(
+      [test(9, 7.3, 95, 250), test(1, 7.5, 100)],
+      [{ measured_at: daysAgo(0), temperature_c: 38 }],
+      daysAgo(20),
+      NOW,
+    );
+    expect(snap.ph).toBe(7.5); // newest test
+    expect(snap.calcium?.valuePpm).toBe(250); // older test, still this fill
+    expect(snap.temperatureIsMeasured).toBe(true);
+    expect(snap.lsi).toBeCloseTo(0.16, 2);
+    expect(snap.verdict?.band).toBe("balanced");
+    expect(snap.missing).toEqual([]);
+  });
+
+  it("takes readings in any order", () => {
+    const newestFirst = lsiSnapshot([test(1, 7.5, 100, 250), test(9, 7.3, 95)], [], null, NOW);
+    const oldestFirst = lsiSnapshot([test(9, 7.3, 95), test(1, 7.5, 100, 250)], [], null, NOW);
+    expect(newestFirst.lsi).toBe(oldestFirst.lsi);
+    expect(newestFirst.ph).toBe(7.5);
+  });
+
+  it("says what's missing instead of guessing at it", () => {
+    const noCalcium = lsiSnapshot([test(1, 7.5, 100)], [], null, NOW);
+    expect(noCalcium.lsi).toBeNull();
+    expect(noCalcium.verdict).toBeNull();
+    expect(noCalcium.missing).toEqual(["a calcium hardness reading"]);
+
+    const nothing = lsiSnapshot([], [], null, NOW);
+    expect(nothing.lsi).toBeNull();
+    expect(nothing.missing).toHaveLength(2);
+  });
+
+  it("falls back to the assumed spa temperature when the probe is silent", () => {
+    const noProbe = lsiSnapshot([test(1, 7.5, 100, 250)], [], null, NOW);
+    expect(noProbe.temperatureIsMeasured).toBe(false);
+    expect(noProbe.temperatureC).toBe(ASSUMED_TEMP_C);
+
+    // A probe reading from a fortnight ago isn't "what the water is now".
+    const staleProbe = lsiSnapshot(
+      [test(1, 7.5, 100, 250)],
+      [{ measured_at: daysAgo(14), temperature_c: 25 }],
+      null,
+      NOW,
+    );
+    expect(staleProbe.temperatureIsMeasured).toBe(false);
+    expect(staleProbe.temperatureC).toBe(ASSUMED_TEMP_C);
+  });
+
+  it("flags a calcium reading that has aged past a month", () => {
+    const fresh = lsiSnapshot([test(1, 7.5, 100, 250)], [], null, NOW);
+    expect(fresh.calciumIsStale).toBe(false);
+
+    const old = lsiSnapshot(
+      [test(60, 7.5, 100, 250), test(1, 7.5, 100)],
+      [],
+      null,
+      NOW,
+    );
+    // Still usable — calcium moves slowly — but the UI should say how old it is.
+    expect(old.calciumIsStale).toBe(true);
+    expect(old.lsi).not.toBeNull();
+    expect(old.calcium?.ageDays).toBe(60);
+  });
+
+  it("drops the calcium when the tub has been drained since", () => {
+    const snap = lsiSnapshot(
+      [test(20, 7.5, 100, 250), test(1, 7.5, 100)],
+      [],
+      daysAgo(10),
+      NOW,
+    );
+    expect(snap.calcium).toBeNull();
+    expect(snap.lsi).toBeNull();
+    expect(snap.missing).toContain("a calcium hardness reading");
   });
 });

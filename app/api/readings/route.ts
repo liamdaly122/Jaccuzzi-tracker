@@ -1,8 +1,15 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getSupabase } from "@/lib/supabase";
-import { getSettings, toSpaConfig, getRecentReadings } from "@/lib/data";
+import {
+  getSettings,
+  toSpaConfig,
+  getRecentReadings,
+  getRecentProbeReadings,
+  getTasks,
+} from "@/lib/data";
 import { readingSchema } from "@/lib/validation";
 import { calculateRecommendations } from "@/lib/chemistry";
+import { lsiSnapshot } from "@/lib/balance";
 
 export const runtime = "nodejs";
 
@@ -69,7 +76,27 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    return NextResponse.json({ reading: data, calculation });
+    // Heater protection: pH, alkalinity, calcium and temperature judged
+    // together. Best-effort — the reading is already saved, so nothing here may
+    // turn a successful save into an error.
+    let balance = null;
+    try {
+      const [history, probeRows, tasks] = await Promise.all([
+        getRecentReadings(30),
+        getRecentProbeReadings(1).catch(() => []),
+        getTasks().catch(() => []),
+      ]);
+      const drainTask = tasks.find((t) => t.task_key === "drain_refill");
+      balance = lsiSnapshot(
+        history,
+        probeRows,
+        drainTask?.last_completed_at ?? null,
+      );
+    } catch {
+      balance = null;
+    }
+
+    return NextResponse.json({ reading: data, calculation, balance });
   } catch (err) {
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Failed to save reading" },

@@ -8,6 +8,7 @@ import type {
   SanitizerUnit,
   TargetRanges,
 } from "@/lib/chemistry";
+import type { LsiSnapshot } from "@/lib/balance";
 import { Button, Card, Field, inputClass } from "./ui";
 import RecommendationList from "./RecommendationList";
 import ScanStripButton from "./ScanStripButton";
@@ -42,6 +43,7 @@ export default function ReadingForm({
 
   const [result, setResult] = useState<CalculationResult | null>(null);
   const [readingId, setReadingId] = useState<number | null>(null);
+  const [balance, setBalance] = useState<LsiSnapshot | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -81,6 +83,7 @@ export default function ReadingForm({
       if (res.ok) {
         setResult(data.calculation as CalculationResult);
         setReadingId(data.reading?.id ?? null);
+        setBalance((data.balance as LsiSnapshot | null) ?? null);
         router.refresh(); // keep dashboard/history fresh
       } else {
         setError(data.error || "Could not save the reading.");
@@ -95,6 +98,7 @@ export default function ReadingForm({
   function reset() {
     setResult(null);
     setReadingId(null);
+    setBalance(null);
     setPh("");
     setTa("");
     setSanitizer("");
@@ -107,7 +111,11 @@ export default function ReadingForm({
   if (result) {
     return (
       <div className="space-y-4">
-        <RecommendationList result={result} readingId={readingId} />
+        <RecommendationList
+          result={result}
+          readingId={readingId}
+          balance={balance}
+        />
         <div className="flex gap-2">
           <Button variant="secondary" onClick={reset} className="flex-1">
             Log another reading

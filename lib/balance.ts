@@ -247,6 +247,14 @@ export function latestCalciumForFill(
   };
 }
 
+// Calcium barely moves between water changes, but it does move — every top-up
+// with fresh tap water shifts it. After a month, treat the number as a guide
+// rather than a measurement and say so.
+export const CALCIUM_STALE_DAYS = 30;
+
+// A probe temperature older than this is no longer "what the water is now".
+const TEMP_FRESH_DAYS = 7;
+
 // --- LSI over time -----------------------------------------------------------
 export interface LsiSeriesReading {
   recorded_at: string;
@@ -318,4 +326,81 @@ export function lsiSeries(
       }),
     };
   });
+}
+
+// --- Where the app actually stands right now ---------------------------------
+//
+// One function assembles the whole picture from the three sources that hold the
+// pieces — the last strip test (pH, alkalinity), whichever strip last measured
+// calcium during this fill, and the probe's latest temperature. Both the
+// dashboard card and the post-test result read from this, so they can never
+// disagree with each other.
+export interface LsiSnapshot {
+  lsi: number | null;
+  verdict: LsiVerdict | null;
+  ph: number | null;
+  alkalinityPpm: number | null;
+  calcium: CalciumSource | null;
+  calciumIsStale: boolean;
+  temperatureC: number;
+  /** False when we fell back to ASSUMED_TEMP_C instead of a probe reading. */
+  temperatureIsMeasured: boolean;
+  /** Plain-English list of what's still needed, when `lsi` is null. */
+  missing: string[];
+}
+
+export function lsiSnapshot(
+  readings: LsiSeriesReading[],
+  probeRows: TempRow[],
+  fillStartIso: string | null = null,
+  now: Date = new Date(),
+): LsiSnapshot {
+  const nowMs = now.getTime();
+
+  const latestReading = [...readings]
+    .map((r) => ({ r, t: new Date(r.recorded_at).getTime() }))
+    .filter((x) => Number.isFinite(x.t))
+    .sort((a, b) => b.t - a.t)[0]?.r;
+
+  const ph = toNum(latestReading?.ph ?? null);
+  const alkalinityPpm = toNum(latestReading?.total_alkalinity_ppm ?? null);
+  const calcium = latestCalciumForFill(
+    readings.map((r) => ({
+      recorded_at: r.recorded_at,
+      calcium_hardness_ppm: r.calcium_hardness_ppm,
+    })),
+    fillStartIso,
+    now,
+  );
+
+  const latestTemp = probeRows
+    .map((p) => ({ t: new Date(p.measured_at).getTime(), c: toNum(p.temperature_c) }))
+    .filter((x): x is { t: number; c: number } => Number.isFinite(x.t) && x.c !== null)
+    .sort((a, b) => b.t - a.t)[0];
+  const tempIsFresh =
+    latestTemp !== undefined &&
+    nowMs - latestTemp.t <= TEMP_FRESH_DAYS * 24 * 60 * 60 * 1000;
+  const temperatureC = tempIsFresh ? latestTemp.c : ASSUMED_TEMP_C;
+
+  const missing: string[] = [];
+  if (ph === null || alkalinityPpm === null) {
+    missing.push("a water test with pH and total alkalinity");
+  }
+  if (calcium === null) {
+    missing.push("a calcium hardness reading");
+  }
+
+  const lsi = computeLsi({ ph, alkalinityPpm, calciumHardnessPpm: calcium?.valuePpm ?? null, temperatureC });
+
+  return {
+    lsi,
+    verdict: lsi === null ? null : interpretLsi(lsi),
+    ph,
+    alkalinityPpm,
+    calcium,
+    calciumIsStale: calcium !== null && calcium.ageDays > CALCIUM_STALE_DAYS,
+    temperatureC,
+    temperatureIsMeasured: tempIsFresh,
+    missing,
+  };
 }

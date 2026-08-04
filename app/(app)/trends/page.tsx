@@ -8,9 +8,11 @@ import {
   getSettings,
   toSpaConfig,
   getRecentProbeReadings,
+  getTasks,
 } from "@/lib/data";
 import { downsampleDaily } from "@/lib/probe";
 import { linearTrend } from "@/lib/predict";
+import { lsiSeries } from "@/lib/balance";
 
 export const dynamic = "force-dynamic";
 
@@ -26,11 +28,12 @@ function trendNote(points: TrendPoint[], decimals: number, unit: string): string
 }
 
 export default async function TrendsPage() {
-  let readings, settings;
+  let readings, settings, tasks;
   try {
-    [readings, settings] = await Promise.all([
+    [readings, settings, tasks] = await Promise.all([
       getRecentReadings(30),
       getSettings(),
+      getTasks().catch(() => []),
     ]);
   } catch (err) {
     return (
@@ -69,6 +72,18 @@ export default async function TrendsPage() {
     value:
       r.total_alkalinity_ppm === null ? null : Number(r.total_alkalinity_ppm),
   }));
+  // Heater protection over time. Calcium is only carried forward within the
+  // current fill, so points before the first calcium test of this fill are
+  // honestly blank rather than back-filled.
+  const fillStart =
+    tasks.find((t) => t.task_key === "drain_refill")?.last_completed_at ?? null;
+  const lsiPoints: TrendPoint[] = lsiSeries(
+    ordered,
+    probeDaily.map((d) => ({ measured_at: d.date, temperature_c: d.temperatureC })),
+    fillStart,
+  );
+  const hasLsi = lsiPoints.filter((p) => p.value !== null).length >= 2;
+
   const isChlorine = config.sanitizerType === "chlorine";
   const sanitizerPoints: TrendPoint[] = ordered.map((r) => ({
     date: r.recorded_at,
@@ -126,6 +141,23 @@ export default async function TrendsPage() {
             decimals={1}
             note={trendNote(sanitizerPoints, 1, "ppm")}
           />
+          {hasLsi ? (
+            <>
+              <TrendChart
+                title="Heater protection (saturation index)"
+                points={lsiPoints}
+                idealMin={-0.3}
+                idealMax={0.3}
+                decimals={2}
+                note={trendNote(lsiPoints, 2, "")}
+              />
+              <p className="text-xs text-slate-400">
+                Below the band the water is corrosive; above it, it deposits
+                scale on the heater. A slow climb is the pattern to catch —
+                it&apos;s invisible in any single number.
+              </p>
+            </>
+          ) : null}
         </div>
       )}
 
