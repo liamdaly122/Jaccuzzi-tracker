@@ -3,7 +3,13 @@ import Icon from "@/components/Icon";
 import SetupNeeded from "@/components/SetupNeeded";
 import TrendChart, { type TrendPoint } from "@/components/TrendChart";
 import { Card } from "@/components/ui";
-import { getRecentReadings, getSettings, toSpaConfig } from "@/lib/data";
+import {
+  getRecentReadings,
+  getSettings,
+  toSpaConfig,
+  getRecentProbeReadings,
+} from "@/lib/data";
+import { downsampleDaily } from "@/lib/probe";
 import { linearTrend } from "@/lib/predict";
 
 export const dynamic = "force-dynamic";
@@ -31,6 +37,24 @@ export default async function TrendsPage() {
       <SetupNeeded message={err instanceof Error ? err.message : "Unknown error"} />
     );
   }
+
+  // Probe history, thinned to one median point a day. Best-effort — the page
+  // still works entirely on strip readings if the table isn't there yet.
+  let probeDaily: ReturnType<typeof downsampleDaily> = [];
+  try {
+    probeDaily = downsampleDaily(await getRecentProbeReadings(1000));
+  } catch {
+    probeDaily = [];
+  }
+  const orpPoints: TrendPoint[] = probeDaily.map((d) => ({
+    date: d.date,
+    value: d.orpMv,
+  }));
+  const tempPoints: TrendPoint[] = probeDaily.map((d) => ({
+    date: d.date,
+    value: d.temperatureC,
+  }));
+  const hasProbeHistory = probeDaily.length >= 2;
 
   const config = toSpaConfig(settings);
   // getRecentReadings is newest-first; charts want oldest -> newest.
@@ -67,7 +91,7 @@ export default async function TrendsPage() {
         </p>
       </div>
 
-      {readings.length < 2 ? (
+      {readings.length < 2 && !hasProbeHistory ? (
         <Card>
           <p className="text-sm text-slate-500">
             Once you&apos;ve logged a couple of water tests, your trends will show
@@ -104,6 +128,38 @@ export default async function TrendsPage() {
           />
         </div>
       )}
+
+      {/* Probe history — far denser than strip readings, so these are the
+          charts that actually show a trend. */}
+      {hasProbeHistory ? (
+        <div className="space-y-3">
+          <h2 className="pt-2 text-sm font-semibold text-slate-700">
+            From your probe
+          </h2>
+          <TrendChart
+            title="Sanitiser strength (ORP)"
+            points={orpPoints}
+            idealMin={config.targetRanges.orpMin ?? 650}
+            idealMax={config.targetRanges.orpMax ?? 750}
+            unit="mV"
+            decimals={0}
+            note={trendNote(orpPoints, 0, "mV")}
+          />
+          <TrendChart
+            title="Water temperature"
+            points={tempPoints}
+            idealMin={36}
+            idealMax={38}
+            unit="°C"
+            decimals={1}
+            note={trendNote(tempPoints, 1, "°C")}
+          />
+          <p className="text-xs text-slate-400">
+            One point per day, taken as the middle reading of that day so a
+            single odd measurement can&apos;t skew it.
+          </p>
+        </div>
+      ) : null}
 
       <Card>
         <Link

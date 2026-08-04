@@ -15,6 +15,8 @@ import {
   getLastNotification,
   getBathersSince,
   getRecentDosing,
+  captureProbeReading,
+  getProbeReadingsSince,
   toTaskLike,
 } from "@/lib/data";
 import { computeNextDue } from "@/lib/tasks";
@@ -30,6 +32,7 @@ import {
 import { buildForecasts } from "@/lib/predict";
 import { getForecast, weatherAdvice, type WeatherForecast } from "@/lib/weather";
 import { getIopoolReading, isIopoolConfigured } from "@/lib/iopool";
+import { orpDrift } from "@/lib/probe";
 import type { IopoolPool } from "@/lib/iopool-parse";
 import {
   dueStatusLabel,
@@ -119,13 +122,26 @@ export default async function DashboardPage() {
     demand = null;
   }
 
-  // Persistent low ORP with pH in range means the sanitiser can't work any
-  // more — a stronger "change it" signal than any calendar.
-  const sanitiserIneffective = Boolean(
-    calc?.safetyFlags.some((f) => f.code === "sanitizer_ineffective") &&
-      latest &&
-      Number(latest.ph) <= config.targetRanges.phIdealMax,
-  );
+  // Sanitiser losing its power. A single low reading is weak evidence, so
+  // prefer the probe's own history: a sustained ORP decline while pH behaves is
+  // the stabiliser-buildup signature. Fall back to the spot reading when there
+  // isn't enough history yet.
+  let drift = null;
+  try {
+    drift = orpDrift(
+      await getProbeReadingsSince(drainTask?.last_completed_at ?? null),
+      config,
+    );
+  } catch {
+    drift = null;
+  }
+  const sanitiserIneffective =
+    drift?.likelyStabiliserBuildup ||
+    Boolean(
+      calc?.safetyFlags.some((f) => f.code === "sanitizer_ineffective") &&
+        latest &&
+        Number(latest.ph) <= config.targetRanges.phIdealMax,
+    );
 
   const verdict = waterChangeVerdict({
     ageDays: waterAgeDays,
@@ -141,7 +157,11 @@ export default async function DashboardPage() {
   let probe: IopoolPool | null = null;
   if (isIopoolConfigured()) {
     const r = await getIopoolReading();
-    if (r.ok) probe = r.pool;
+    if (r.ok) {
+      probe = r.pool;
+      // Opportunistic history: every visit banks the current measurement.
+      await captureProbeReading(r.pool.measure);
+    }
   }
 
   // Weather (only when a location is set; fetch failures just hide the card).
@@ -200,6 +220,16 @@ export default async function DashboardPage() {
       ) : null}
 
       {probe ? <ProbeCard pool={probe} ranges={config.targetRanges} /> : null}
+
+      {/* Sanitiser drift, explained in plain terms */}
+      {drift?.message ? (
+        <Card className="border-amber-200 bg-amber-50">
+          <p className="flex items-start gap-2 text-sm text-amber-900">
+            <Icon name="trend-up" size={17} className="mt-0.5 shrink-0" />
+            <span>{drift.message}</span>
+          </p>
+        </Card>
+      ) : null}
 
       {/* Predictive heads-up */}
       {forecasts.length > 0 ? (

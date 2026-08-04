@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getIopoolReading } from "@/lib/iopool";
+import { captureProbeReading } from "@/lib/data";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -14,5 +15,10 @@ export async function GET(request: NextRequest) {
   if (!result.ok) {
     return NextResponse.json({ error: result.error }, { status: 502 });
   }
+
+  // Keep the measurement. Deduped on the probe's own timestamp, so repeat
+  // reads of an unchanged value cost nothing.
+  await captureProbeReading(result.pool.measure);
+
   return NextResponse.json({ ok: true, pool: result.pool });
 }

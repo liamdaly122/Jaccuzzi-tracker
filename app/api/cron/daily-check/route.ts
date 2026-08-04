@@ -15,6 +15,8 @@ import { calculateRecommendations } from "@/lib/chemistry";
 import { buildForecasts } from "@/lib/predict";
 import { usageWaterStatus, sanitiserDemandTrend } from "@/lib/water";
 import { getForecast, weatherAdvice } from "@/lib/weather";
+import { getIopoolReading, isIopoolConfigured } from "@/lib/iopool";
+import { captureProbeReading, pruneProbeReadings } from "@/lib/data";
 import { sendNtfy } from "@/lib/ntfy";
 
 export const runtime = "nodejs";
@@ -40,6 +42,9 @@ async function handle(request: NextRequest) {
   let forecastAlerts: string[] = [];
   let usageAlert: string | null = null;
   let weatherAlerts: string[] = [];
+  let probeAlerts: string[] = [];
+  let probeCaptured = false;
+  let prunedRows = 0;
   let hasDanger = false;
 
   try {
@@ -115,6 +120,40 @@ async function handle(request: NextRequest) {
       // dosing history unavailable — skip.
     }
 
+    // The probe: bank today's measurement, prune old history so storage stays
+    // bounded, and — the point of doing this here — warn about a problem that
+    // developed overnight, which otherwise goes unnoticed until the app is
+    // next opened.
+    if (isIopoolConfigured()) {
+      const probe = await getIopoolReading({ fresh: true });
+      if (probe.ok) {
+        const m = probe.pool.measure;
+        probeCaptured = await captureProbeReading(m);
+
+        const r = config.targetRanges;
+        const orpMin = r.orpMin ?? 650;
+        const orpMax = r.orpMax ?? 750;
+        if (m.isValid && m.orpMv !== null) {
+          if (m.orpMv < orpMin - 100) {
+            probeAlerts.push(`Sanitiser has collapsed (${m.orpMv} mV) — don't get in`);
+            hasDanger = true;
+          } else if (m.orpMv < orpMin) {
+            probeAlerts.push(`Sanitiser low (${m.orpMv} mV, aim ${orpMin}+)`);
+          } else if (m.orpMv > orpMax + 100) {
+            probeAlerts.push(`Sanitiser very high (${m.orpMv} mV) — let it fall before use`);
+            hasDanger = true;
+          }
+        }
+        if (m.isValid && m.ph !== null) {
+          if (m.ph > r.phAcceptableMax || m.ph < r.phAcceptableMin) {
+            probeAlerts.push(`pH is ${m.ph} — outside the safe band`);
+            hasDanger = true;
+          }
+        }
+      }
+      prunedRows = await pruneProbeReadings();
+    }
+
     // Weather advisories (frost/heat) if a location is set.
     if (settings.latitude != null && settings.longitude != null) {
       const forecast = await getForecast(
@@ -142,6 +181,7 @@ async function handle(request: NextRequest) {
   if (chemAlerts.length) parts.push(`Water: ${chemAlerts.join(" ")}`);
   if (forecastAlerts.length) parts.push(`Forecast: ${forecastAlerts.join(", ")}`);
   if (usageAlert) parts.push(usageAlert);
+  if (probeAlerts.length) parts.push(`Probe: ${probeAlerts.join(" · ")}`);
   if (weatherAlerts.length) parts.push(`Weather: ${weatherAlerts.join(" ")}`);
   const summary = parts.join(" · ");
 
@@ -175,6 +215,9 @@ async function handle(request: NextRequest) {
     forecastAlerts,
     usageAlert,
     weatherAlerts,
+    probeAlerts,
+    probeCaptured,
+    prunedRows,
   });
 }
 
