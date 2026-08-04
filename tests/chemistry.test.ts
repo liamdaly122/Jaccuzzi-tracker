@@ -229,14 +229,28 @@ describe("calcium hardness (optional)", () => {
     ).toBe(false);
   });
 
-  it("flags (info only) when supplied and out of range", () => {
+  it("flags when supplied and out of range, without inventing a dose", () => {
     const high = calculateRecommendations(
       { ...balanced, calciumHardnessPpm: 400 },
       chlorineConfig(),
     );
     const r = high.recommendations.find((x) => x.label.includes("Calcium"))!;
     expect(r).toBeDefined();
-    expect(r.severity).toBe("info");
+    // Not decorative: calcium is one of the four inputs to the saturation index
+    // that protects the heater. But there's no product that removes it, so the
+    // flag never carries a gram figure.
+    expect(r.severity).toBe("low");
+    expect(r.amountGrams).toBeNull();
+  });
+
+  it("names dilution, not a chemical, for high calcium", () => {
+    const high = calculateRecommendations(
+      { ...balanced, calciumHardnessPpm: 400 },
+      chlorineConfig(),
+    );
+    const r = high.recommendations.find((x) => x.label.includes("Calcium"))!;
+    expect(r.instructions).toMatch(/dilut/i);
+    expect(r.chemical).toBeNull();
   });
 
   it("no flag when supplied and in range", () => {

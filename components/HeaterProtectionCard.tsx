@@ -34,39 +34,34 @@ const IDEAL_MAX = 0.3;
 
 const BAND_STYLE: Record<
   LsiBand,
-  { tone: string; word: string; icon: IconName; text: string; surface: string }
+  { tone: string; icon: IconName; text: string; surface: string }
 > = {
   corrosive: {
     tone: CRITICAL,
-    word: "Corrosive",
     icon: "alert-triangle",
     text: "text-red-800",
     surface: "bg-red-50",
   },
   "slightly-corrosive": {
     tone: WARNING,
-    word: "Slightly corrosive",
     icon: "alert-triangle",
     text: "text-amber-800",
     surface: "bg-amber-50",
   },
   balanced: {
     tone: GOOD,
-    word: "Balanced",
     icon: "check-circle",
     text: "text-emerald-800",
     surface: "bg-emerald-50",
   },
   "slightly-scaling": {
     tone: WARNING,
-    word: "Slightly scaling",
     icon: "alert-triangle",
     text: "text-amber-800",
     surface: "bg-amber-50",
   },
   scaling: {
     tone: CRITICAL,
-    word: "Scaling",
     icon: "alert-triangle",
     text: "text-red-800",
     surface: "bg-red-50",
@@ -205,8 +200,8 @@ export default function HeaterProtectionCard({
       ) : null}
 
       <p className="mt-3 text-xs text-slate-400">
-        Worked out from your last test (pH {snapshot.ph}, alkalinity{" "}
-        {snapshot.alkalinityPpm} ppm), calcium {calcium?.valuePpm} ppm
+        Worked out from your last test (pH {snapshot.ph.toFixed(1)}, alkalinity{" "}
+        {Math.round(snapshot.alkalinityPpm)} ppm), calcium {calcium?.valuePpm} ppm
         {calcium && calcium.ageDays > 0
           ? ` measured ${calcium.ageDays} day${calcium.ageDays === 1 ? "" : "s"} ago`
           : ""}

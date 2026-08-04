@@ -8,6 +8,7 @@
 
 import type { SpaConfig } from "./chemistry";
 import type { IconName } from "./icons";
+import { ASSUMED_TEMP_C, computeLsi } from "./balance";
 
 // A tolerant reading shape: every value may be missing. Mapped from a
 // TestReadingRow by the page (or null when no reading exists yet).
@@ -17,6 +18,9 @@ export interface TroubleshootReading {
   brominePpm: number | null;
   totalAlkalinityPpm: number | null;
   calciumHardnessPpm: number | null;
+  // From the probe, when there is one. Only the saturation-index check uses it,
+  // and that check falls back to the assumed spa temperature without it.
+  temperatureC?: number | null;
 }
 
 interface DiagnoseContext {
@@ -88,6 +92,18 @@ const sanMax = (c: DiagnoseContext) =>
     : c.config.targetRanges.brMax;
 const sanLow = (c: DiagnoseContext) => c.active != null && c.active < sanMin(c);
 const sanHigh = (c: DiagnoseContext) => c.active != null && c.active > sanMax(c);
+// The combination, not any single number. Scale can form with pH, alkalinity
+// and calcium all individually "in range" — this is the only check that sees it.
+const waterIsScaleForming = (c: DiagnoseContext) => {
+  const lsi = computeLsi({
+    ph: c.reading?.ph ?? null,
+    alkalinityPpm: c.reading?.totalAlkalinityPpm ?? null,
+    calciumHardnessPpm: c.reading?.calciumHardnessPpm ?? null,
+    temperatureC: c.reading?.temperatureC ?? ASSUMED_TEMP_C,
+  });
+  return lsi !== null && lsi > 0.3;
+};
+
 const chHigh = (c: DiagnoseContext) =>
   c.reading?.calciumHardnessPpm != null &&
   c.reading.calciumHardnessPpm > c.config.targetRanges.chMax;
@@ -302,6 +318,12 @@ const SYMPTOMS: SymptomDef[] = [
     icon: "snowflake",
     blurb: "White crust on the waterline, or white flakes floating in the water.",
     causes: [
+      {
+        cause: "The balance as a whole is scale-forming",
+        why: "pH, alkalinity, calcium and temperature act together. Each can sit inside its own range while the combination still drops calcium out of the water — and hot-tub heat makes that far more likely than it would be in a pool.",
+        fix: "Lower pH towards 7.2 first — it's the strongest and easiest lever. If pH is already low, bring alkalinity down towards 80 ppm. See the heater-protection reading on your dashboard.",
+        flagWhen: waterIsScaleForming,
+      },
       {
         cause: "High calcium hardness",
         why: "Lots of dissolved calcium drops out as scale, especially at hot-tub temperatures.",

@@ -279,6 +279,13 @@ This uses a free service with no key needed.
   were a fortnight ago** — that last one is the water telling you it's tiring,
   usually before the calendar does. It also shows what a refill costs to heat,
   so you change it on the numbers rather than out of habit.
+- **Heater protection (Today screen):** every other check looks at one number on
+  its own. This one looks at pH, alkalinity, calcium **and water temperature
+  together** — because they can each read "in range" while the combination
+  quietly furs up your heating element, which is the expensive thing to replace.
+  It needs a **calcium hardness** number, which your probe can't measure but
+  most 6-in-1 strips can. Enter one every few weeks (calcium barely moves) and
+  the card comes alive, with a matching chart on the Trends page.
 - **Test strips or a probe:** in Settings you can switch between **ppm** (test
   strips) and **ORP** (a probe such as an iopool, measured in millivolts). ORP
   measures whether your sanitiser is actually *working*, which is the better

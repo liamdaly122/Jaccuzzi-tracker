@@ -7,7 +7,12 @@ import {
   type TroubleshootReading,
   type Diagnosis,
 } from "@/lib/troubleshoot";
-import { getLatestReading, getSettings, toSpaConfig } from "@/lib/data";
+import {
+  getLatestReading,
+  getSettings,
+  toSpaConfig,
+  getRecentProbeReadings,
+} from "@/lib/data";
 import {
   DEFAULT_TARGET_RANGES,
   DEFAULT_DOSING_CONSTANTS,
@@ -17,6 +22,18 @@ import {
 export const dynamic = "force-dynamic";
 
 type Params = Promise<{ symptom: string }>;
+
+// Best-effort: no probe, no probe table, no problem — the saturation check
+// falls back to the assumed spa temperature.
+async function latestProbeTemperature(): Promise<number | null> {
+  try {
+    const rows = await getRecentProbeReadings(1);
+    const t = rows[0]?.temperature_c;
+    return t === null || t === undefined ? null : Number(t);
+  } catch {
+    return null;
+  }
+}
 
 export default async function SymptomPage({ params }: { params: Params }) {
   const { symptom } = await params;
@@ -49,6 +66,8 @@ export default async function SymptomPage({ params }: { params: Params }) {
           latest.calcium_hardness_ppm === null
             ? null
             : Number(latest.calcium_hardness_ppm),
+        // The probe's latest water temperature, for the saturation-index check.
+        temperatureC: await latestProbeTemperature(),
       };
     }
   } catch {

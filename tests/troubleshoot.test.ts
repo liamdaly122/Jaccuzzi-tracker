@@ -109,6 +109,62 @@ describe("diagnose", () => {
     expect(d.causes.some((c) => c.flagged)).toBe(false);
   });
 
+  // The saturation-index cause is the only one that can fire when every
+  // individual number reads fine — which is exactly the case that furs up a
+  // heater without anything else warning you.
+  it("flags scale-forming balance even with every number inside its own range", () => {
+    const reading: TroubleshootReading = {
+      ph: 7.8, // top of acceptable
+      freeChlorinePpm: 4,
+      brominePpm: null,
+      totalAlkalinityPpm: 120, // top of range
+      calciumHardnessPpm: 250, // top of range
+      temperatureC: 40,
+    };
+    const d = diagnose("scale", reading, chlorineConfig)!;
+    const lsiCause = d.causes.find((c) => c.cause.includes("balance as a whole"))!;
+    expect(lsiCause.flagged).toBe(true);
+    // Nothing is individually out of range, so no other cause should fire.
+    expect(d.causes.filter((c) => c.flagged)).toHaveLength(1);
+    // Flagged causes come first.
+    expect(d.causes[0].cause).toBe(lsiCause.cause);
+  });
+
+  it("stays quiet on balanced water", () => {
+    const reading: TroubleshootReading = {
+      ph: 7.4,
+      freeChlorinePpm: 4,
+      brominePpm: null,
+      totalAlkalinityPpm: 90,
+      calciumHardnessPpm: 150,
+      temperatureC: 38,
+    };
+    const d = diagnose("scale", reading, chlorineConfig)!;
+    expect(d.causes.some((c) => c.cause.includes("balance as a whole") && c.flagged)).toBe(
+      false,
+    );
+  });
+
+  it("cannot judge the balance without a calcium reading", () => {
+    const reading: TroubleshootReading = {
+      ph: 8.0,
+      freeChlorinePpm: 4,
+      brominePpm: null,
+      totalAlkalinityPpm: 150,
+      calciumHardnessPpm: null,
+      temperatureC: 40,
+    };
+    const d = diagnose("scale", reading, chlorineConfig)!;
+    // pH/alkalinity are genuinely high, so that cause fires — but the
+    // combination check refuses to guess at the missing calcium.
+    expect(d.causes.some((c) => c.cause.includes("balance as a whole") && c.flagged)).toBe(
+      false,
+    );
+    expect(d.causes.some((c) => c.cause.includes("pH or alkalinity") && c.flagged)).toBe(
+      true,
+    );
+  });
+
   it("keeps a stable order among unflagged causes", () => {
     const d1 = diagnose("scale", null, chlorineConfig)!;
     const d2 = diagnose("scale", emptyReading, chlorineConfig)!;

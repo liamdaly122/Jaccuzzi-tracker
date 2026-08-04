@@ -656,9 +656,12 @@ function calciumFlag(
     label: low ? "Calcium hardness low" : "Calcium hardness high",
     amountGrams: null,
     instructions: low
-      ? `Calcium hardness is low (${ch} ppm, aim for ${chMin}–${chMax}). Low calcium can make water corrosive; a calcium hardness increaser helps. This is less critical for an inflatable spa.`
-      : `Calcium hardness is high (${ch} ppm, aim for ${chMin}–${chMax}). High calcium can cause cloudiness and scale; diluting with softer water helps. This is less critical for an inflatable spa.`,
-    severity: "info",
+      ? `Calcium hardness is low (${ch} ppm, aim for ${chMin}–${chMax}). Soft water is "hungry" — it pulls calcium out of whatever it can reach, including the heater and its seals. A calcium hardness increaser fixes it.`
+      : `Calcium hardness is high (${ch} ppm, aim for ${chMin}–${chMax}). There's no additive that removes calcium, so the practical fix is diluting with softer water at the next top-up or refill. Meanwhile keep pH at the lower end of range, which is what stops it depositing as scale.`,
+    // Not decorative. Calcium is one of the four inputs to the saturation index
+    // (lib/balance.ts) — the check that decides whether the water scales up the
+    // heating element or corrodes it. See the heater-protection card.
+    severity: "low",
     order: 5,
   };
 }
