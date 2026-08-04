@@ -81,10 +81,19 @@ your phone. The rest you can forget after setup.
    (bottom-right). You should see **"Success. No rows returned."** 🎉 That built
    all your tables.
 6. Now get your two values. On the left sidebar click **Project Settings** (the
-   gear) → **API**. You'll see:
+   gear) → **API**.
    - **Project URL** — copy it. This is your `SUPABASE_URL` (value #3).
-   - **Project API keys** → the **`service_role`** key (click **Reveal**, then
-     copy). This is your `SUPABASE_SERVICE_ROLE_KEY` (value #4).
+   - Now the key — **read this bit carefully, it's the easiest thing to get
+     wrong.** Look for a section called **"Legacy anon, service_role API
+     keys"** and open it. Copy the one labelled **`service_role`** (click
+     **Reveal** first). That's your `SUPABASE_SERVICE_ROLE_KEY` (value #4).
+
+   > ⚠️ **Do not grab the key on the main API page.** Supabase now shows a
+   > *publishable* key there by default, and the `service_role` key lives in
+   > that separate **Legacy** section. They look almost identical. If you paste
+   > the wrong one, the app appears to work fine — right up until you turn on
+   > the database security setting, and then every page says "Almost there — one
+   > setup step left". If that happens to you, this is why.
 
    ⚠️ The `service_role` key is powerful — paste it only into Vercel (next part).
    Don't post it publicly or in chat.
@@ -309,6 +318,13 @@ less and retest.
   spaces). After changing env vars in Vercel, click **Redeploy**.
 - **I changed a setting in Vercel but nothing happened.** Env var changes only
   take effect on a new deploy: Vercel → **Deployments** → **⋯** → **Redeploy**.
+- **Every page says "Almost there — one setup step left", and it used to
+  work.** Almost always the wrong Supabase key. Go to Supabase → Project
+  Settings → API → **"Legacy anon, service_role API keys"** and copy the
+  **`service_role`** one (not the publishable key on the main page), then
+  update `SUPABASE_SERVICE_ROLE_KEY` in Vercel and redeploy. The app needs the
+  `service_role` key specifically, because that's the only one allowed past the
+  database's Row Level Security.
 - **No notifications.** Make sure the topic in the ntfy app matches `NTFY_TOPIC`
   exactly (case-sensitive), and that notifications are allowed for the ntfy app
   in your phone settings. The check runs once each morning.
