@@ -1,8 +1,12 @@
 import { describe, it, expect } from "vitest";
 import {
   ASSUMED_TEMP_C,
+  carbonateAlkalinity,
   computeLsi,
+  cyanurateCorrectionFactor,
   interpretLsi,
+  latestCyaForFill,
+  CYA_STALE_DAYS,
   latestCalciumForFill,
   lsiSeries,
   lsiSnapshot,
@@ -90,6 +94,83 @@ describe("computeLsi — worked examples", () => {
     const lowTds = computeLsi({ ...base, tdsPpm: 500 })!;
     const highTds = computeLsi({ ...base, tdsPpm: 2000 })!;
     expect(Math.abs(lowTds - highTds)).toBeLessThan(0.07);
+  });
+});
+
+describe("cyanurate correction", () => {
+  // The whole feature rests on this factor, so it's pinned to the figures the
+  // PHTA publishes rather than to whatever the code happens to produce.
+  it("reproduces the published correction factors", () => {
+    expect(cyanurateCorrectionFactor(7.4)).toBeCloseTo(0.31, 2);
+    expect(cyanurateCorrectionFactor(7.6)).toBeCloseTo(0.33, 2);
+  });
+
+  it("rises with pH, because more of the acid has dissociated", () => {
+    expect(cyanurateCorrectionFactor(7.0)).toBeLessThan(
+      cyanurateCorrectionFactor(7.5),
+    );
+    expect(cyanurateCorrectionFactor(7.5)).toBeLessThan(
+      cyanurateCorrectionFactor(8.0),
+    );
+    // Never more than the full CaCO3 equivalence, however high the pH goes.
+    expect(cyanurateCorrectionFactor(12)).toBeLessThan(50 / 129 + 1e-9);
+  });
+
+  it("subtracts stabiliser from the alkalinity that counts", () => {
+    // CYA 50 at pH 7.5 -> ~16 ppm of the 100 is cyanurate, not carbonate.
+    expect(carbonateAlkalinity(100, 50, 7.5)).toBeCloseTo(83.8, 1);
+  });
+
+  it("leaves alkalinity untouched when CYA was never measured", () => {
+    // Absent is not the same as zero — this is the pre-CYA behaviour.
+    expect(carbonateAlkalinity(100, null, 7.5)).toBe(100);
+  });
+
+  it("treats a genuine zero as a real measurement of none", () => {
+    expect(carbonateAlkalinity(100, 0, 7.5)).toBe(100);
+  });
+});
+
+describe("computeLsi with stabiliser", () => {
+  const base = {
+    ph: 7.5,
+    alkalinityPpm: 100,
+    calciumHardnessPpm: 250,
+    temperatureC: 38,
+  };
+
+  it("lowers the index, because cyanurate never took part in the balance", () => {
+    const uncorrected = computeLsi(base)!;
+    const corrected = computeLsi({ ...base, cyanuricAcidPpm: 50 })!;
+    expect(corrected).toBeLessThan(uncorrected);
+    // ~0.08 at CYA 50 — enough to matter against band edges at +/-0.3.
+    expect(uncorrected - corrected).toBeCloseTo(0.08, 2);
+  });
+
+  it("corrects further as stabiliser climbs", () => {
+    const at50 = computeLsi({ ...base, cyanuricAcidPpm: 50 })!;
+    const at100 = computeLsi({ ...base, cyanuricAcidPpm: 100 })!;
+    expect(computeLsi(base)! - at100).toBeCloseTo(0.17, 2);
+    expect(at100).toBeLessThan(at50);
+  });
+
+  it("is unchanged when CYA is absent — old readings keep their old answer", () => {
+    expect(computeLsi({ ...base, cyanuricAcidPpm: null })).toBe(computeLsi(base));
+  });
+
+  it("can flip a 'scaling' verdict back to balanced", () => {
+    const water = { ph: 7.8, alkalinityPpm: 120, calciumHardnessPpm: 300, temperatureC: 40 };
+    const without = computeLsi(water)!;
+    const with100 = computeLsi({ ...water, cyanuricAcidPpm: 100 })!;
+    expect(interpretLsi(without).band).toBe("scaling");
+    expect(interpretLsi(with100).band).not.toBe("scaling");
+  });
+
+  it("refuses to answer when stabiliser has eaten the whole alkalinity", () => {
+    // 200 ppm CYA at pH 7.5 is ~65 ppm of cyanurate — more than a TA of 50.
+    expect(
+      computeLsi({ ...base, alkalinityPpm: 50, cyanuricAcidPpm: 200 }),
+    ).toBeNull();
   });
 });
 
@@ -370,6 +451,39 @@ describe("lsiSeries", () => {
   });
 });
 
+describe("latestCyaForFill", () => {
+  const cyaReading = (ago: number, cya: number | null) => ({
+    recorded_at: daysAgo(ago),
+    cyanuric_acid_ppm: cya,
+  });
+
+  it("carries the most recent stabiliser reading forward", () => {
+    const found = latestCyaForFill(
+      [cyaReading(9, 30), cyaReading(2, 60), cyaReading(1, null)],
+      daysAgo(30),
+      NOW,
+    );
+    expect(found?.valuePpm).toBe(60);
+    expect(found?.ageDays).toBe(2);
+  });
+
+  it("never carries it across a drain — a refill resets stabiliser to zero", () => {
+    expect(
+      latestCyaForFill([cyaReading(20, 90)], daysAgo(10), NOW),
+    ).toBeNull();
+  });
+
+  it("returns null when the strip has no stabiliser pad", () => {
+    expect(
+      latestCyaForFill([{ recorded_at: daysAgo(1) }], null, NOW),
+    ).toBeNull();
+  });
+
+  it("goes stale faster than calcium, because dichlor keeps adding it", () => {
+    expect(CYA_STALE_DAYS).toBeLessThan(30);
+  });
+});
+
 describe("lsiSnapshot", () => {
   const test = (
     ago: number,
@@ -446,6 +560,75 @@ describe("lsiSnapshot", () => {
     expect(old.calciumIsStale).toBe(true);
     expect(old.lsi).not.toBeNull();
     expect(old.calcium?.ageDays).toBe(60);
+  });
+
+  it("uses stabiliser when a strip has measured it, and says so", () => {
+    const withCya = lsiSnapshot(
+      [
+        {
+          recorded_at: daysAgo(1),
+          ph: 7.5,
+          total_alkalinity_ppm: 100,
+          calcium_hardness_ppm: 250,
+          cyanuric_acid_ppm: 50,
+        },
+      ],
+      [],
+      null,
+      NOW,
+    );
+    expect(withCya.cya?.valuePpm).toBe(50);
+    expect(withCya.cyaCorrected).toBe(true);
+    expect(withCya.carbonateAlkalinityPpm).toBeCloseTo(83.8, 1);
+    // Lower than the uncorrected 0.16 for the same water.
+    expect(withCya.lsi).toBeLessThan(0.16);
+  });
+
+  it("admits when it is still working without a stabiliser reading", () => {
+    const snap = lsiSnapshot([test(1, 7.5, 100, 250)], [], null, NOW);
+    expect(snap.cyaCorrected).toBe(false);
+    expect(snap.cya).toBeNull();
+    // Carbonate alkalinity falls back to the total, so the number is unchanged.
+    expect(snap.carbonateAlkalinityPpm).toBe(100);
+    expect(snap.lsi).toBeCloseTo(0.16, 2);
+  });
+
+  it("flags a stabiliser reading that has aged past a fortnight", () => {
+    const snap = lsiSnapshot(
+      [
+        {
+          recorded_at: daysAgo(20),
+          ph: 7.5,
+          total_alkalinity_ppm: 100,
+          calcium_hardness_ppm: 250,
+          cyanuric_acid_ppm: 50,
+        },
+      ],
+      [],
+      null,
+      NOW,
+    );
+    expect(snap.cyaIsStale).toBe(true);
+  });
+
+  it("reports over-stabilised water as a finding, not a missing input", () => {
+    const snap = lsiSnapshot(
+      [
+        {
+          recorded_at: daysAgo(1),
+          ph: 7.5,
+          total_alkalinity_ppm: 50,
+          calcium_hardness_ppm: 250,
+          cyanuric_acid_ppm: 200,
+        },
+      ],
+      [],
+      null,
+      NOW,
+    );
+    expect(snap.lsi).toBeNull();
+    expect(snap.overStabilised).toBe(true);
+    expect(snap.missing.join(" ")).toMatch(/fresh water/i);
   });
 
   it("drops the calcium when the tub has been drained since", () => {

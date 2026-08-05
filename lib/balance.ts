@@ -27,12 +27,14 @@
 //  continuous in temperature (no interpolation), and makes the TDS assumption
 //  explicit instead of hiding it in a constant.
 //
-//  Two honest limitations, both deliberate:
+//  Two honest limitations:
 //    1. The full treatment subtracts a cyanuric-acid correction from alkalinity.
-//       We don't measure CYA, so total alkalinity is used directly. Dichlor
-//       steadily adds CYA, so this OVERSTATES LSI a little — erring towards
-//       warning about scale early, which is the safe direction for a heater,
-//       but it is an approximation and the UI says so.
+//       When a strip has measured CYA we now do exactly that (see
+//       `carbonateAlkalinity` below) and the index is no longer approximate on
+//       this point. WITHOUT a CYA reading we fall back to using total alkalinity
+//       directly, which OVERSTATES LSI a little — erring towards warning about
+//       scale early, the safe direction for a heater. `LsiSnapshot.cyaCorrected`
+//       says which of the two applies so the UI never claims more than it knows.
 //    2. TDS is assumed rather than measured. It's a weak term: across the whole
 //       plausible spa range (500–2000 ppm) it moves LSI by under 0.06.
 //
@@ -62,11 +64,62 @@ export function saturationPh(
   return 9.3 + a + b - (c + d);
 }
 
+// --- Cyanuric acid (stabiliser) ----------------------------------------------
+//
+// A test strip's "total alkalinity" pad measures ALL alkalinity, but only the
+// carbonate part takes part in the scaling balance. Cyanurate — the ion that
+// stabiliser dissolves into — is counted by the test and does nothing here, so
+// leaving it in inflates the D term and OVERSTATES LSI. That's the approximation
+// this app shipped with, and a CYA reading removes it.
+//
+// How much cyanurate is present depends on pH, because cyanuric acid only
+// partly dissociates:
+//
+//   factor(pH) = [ 1 / (1 + 10^(pKa - pH)) ] x (50 / 129)
+//
+// where 50 is the CaCO3 equivalent weight and 129 g/mol is cyanuric acid's molar
+// mass. Continuous in pH — no interpolated table, for the same reason the
+// temperature term isn't one.
+//
+// pKa 6.8 is chosen because it reproduces the factors the PHTA publishes:
+// 0.310 against their 0.31 at pH 7.4, and 0.335 against their 0.33 at pH 7.6.
+// (pKa 6.7 and 6.88 both miss by ~0.012, so this isn't a free parameter.)
+//
+// Worth knowing how big this is: at TA 100 it pulls LSI down by 0.04 at CYA 30,
+// 0.08 at CYA 50 and 0.17 at CYA 100. Against band edges of +/-0.3 that is a
+// real correction, not a rounding detail.
+export const CYA_PKA = 6.8;
+const CYA_CACO3_EQUIVALENT = 50 / 129;
+
+/** How much of a ppm of stabiliser shows up as alkalinity at this pH. */
+export function cyanurateCorrectionFactor(ph: number): number {
+  return (1 / (1 + Math.pow(10, CYA_PKA - ph))) * CYA_CACO3_EQUIVALENT;
+}
+
+/**
+ * The alkalinity that actually takes part in the scaling balance.
+ * Without a CYA reading this returns total alkalinity unchanged — the old
+ * behaviour, which errs towards warning about scale early.
+ */
+export function carbonateAlkalinity(
+  totalAlkalinityPpm: number,
+  cyanuricAcidPpm: number | null,
+  ph: number,
+): number {
+  if (cyanuricAcidPpm === null || !Number.isFinite(cyanuricAcidPpm)) {
+    return totalAlkalinityPpm;
+  }
+  const cyanurate = Math.max(0, cyanuricAcidPpm) * cyanurateCorrectionFactor(ph);
+  return totalAlkalinityPpm - cyanurate;
+}
+
 export interface LsiInput {
   ph: number | null;
   alkalinityPpm: number | null;
   calciumHardnessPpm: number | null;
   temperatureC: number | null;
+  /** Optional. Absent means "not measured", which is not the same as zero. */
+  cyanuricAcidPpm?: number | null;
   tdsPpm?: number;
 }
 
@@ -95,7 +148,17 @@ export function computeLsi(input: LsiInput): number | null {
     return null;
   }
 
-  const lsi = ph - saturationPh(alkalinityPpm, calciumHardnessPpm, temperatureC, tds);
+  // Heavily stabilised water with low alkalinity can leave nothing carbonate
+  // behind. That's a finding in its own right, not a number to fudge — say
+  // nothing rather than take a logarithm of zero.
+  const carbonate = carbonateAlkalinity(
+    alkalinityPpm,
+    input.cyanuricAcidPpm ?? null,
+    ph,
+  );
+  if (carbonate <= 0) return null;
+
+  const lsi = ph - saturationPh(carbonate, calciumHardnessPpm, temperatureC, tds);
   return Math.round(lsi * 100) / 100;
 }
 
@@ -191,15 +254,15 @@ export function interpretLsi(lsi: number): LsiVerdict {
   };
 }
 
-// --- Occasional calcium readings --------------------------------------------
+// --- Occasional strip readings ------------------------------------------------
 //
-// Calcium only changes when water is added or replaced, so the most recent
-// reading stays valid for days or weeks — unlike sanitiser, which moves hourly.
-// That matters because calcium comes from a strip used now and then, not from
-// the probe.
+// Calcium and stabiliser both come from a strip used now and then, not from the
+// probe, and both stay meaningful for days or weeks — unlike sanitiser, which
+// moves hourly. So the most recent value carries forward.
 //
-// The hard rule: a calcium reading from BEFORE the last drain describes water
-// that no longer exists, so it must never be carried across a water change.
+// The hard rule, and the reason this is one shared function: a value from BEFORE
+// the last drain describes water that no longer exists, and must never be
+// carried across a water change.
 export interface CalciumSource {
   valuePpm: number;
   measuredAt: string;
@@ -211,8 +274,15 @@ export interface CalciumReadingLike {
   calcium_hardness_ppm: number | string | null;
 }
 
-export function latestCalciumForFill(
-  readings: CalciumReadingLike[],
+export interface CyaReadingLike {
+  recorded_at: string;
+  cyanuric_acid_ppm?: number | string | null;
+}
+
+// The generic engine. `pick` pulls whichever column this lookup is about.
+export function latestForFill<T extends { recorded_at: string }>(
+  readings: T[],
+  pick: (row: T) => number | string | null | undefined,
   fillStartIso: string | null,
   now: Date = new Date(),
 ): CalciumSource | null {
@@ -221,10 +291,8 @@ export function latestCalciumForFill(
   const candidates = readings
     .map((r) => {
       const t = new Date(r.recorded_at).getTime();
-      const v =
-        r.calcium_hardness_ppm === null || r.calcium_hardness_ppm === ""
-          ? null
-          : Number(r.calcium_hardness_ppm);
+      const raw = pick(r);
+      const v = raw === null || raw === undefined || raw === "" ? null : Number(raw);
       return { t, v };
     })
     .filter(
@@ -247,10 +315,30 @@ export function latestCalciumForFill(
   };
 }
 
+export function latestCalciumForFill(
+  readings: CalciumReadingLike[],
+  fillStartIso: string | null,
+  now: Date = new Date(),
+): CalciumSource | null {
+  return latestForFill(readings, (r) => r.calcium_hardness_ppm, fillStartIso, now);
+}
+
+export function latestCyaForFill(
+  readings: CyaReadingLike[],
+  fillStartIso: string | null,
+  now: Date = new Date(),
+): CalciumSource | null {
+  return latestForFill(readings, (r) => r.cyanuric_acid_ppm, fillStartIso, now);
+}
+
 // Calcium barely moves between water changes, but it does move — every top-up
 // with fresh tap water shifts it. After a month, treat the number as a guide
 // rather than a measurement and say so.
 export const CALCIUM_STALE_DAYS = 30;
+
+// Stabiliser goes stale faster: with dichlor, every single dose adds more of it,
+// so a fortnight-old number is already behind the water.
+export const CYA_STALE_DAYS = 14;
 
 // A probe temperature older than this is no longer "what the water is now".
 const TEMP_FRESH_DAYS = 7;
@@ -261,6 +349,7 @@ export interface LsiSeriesReading {
   ph: number | string | null;
   total_alkalinity_ppm: number | string | null;
   calcium_hardness_ppm: number | string | null;
+  cyanuric_acid_ppm?: number | string | null;
 }
 export interface TempRow {
   measured_at: string;
@@ -311,17 +400,16 @@ export function lsiSeries(
     const t = new Date(r.recorded_at).getTime();
     // Calcium as known at that point in the fill, so history isn't rewritten by
     // a measurement taken later.
-    const calcium = latestCalciumForFill(
-      ordered.filter((x) => new Date(x.recorded_at).getTime() <= t),
-      fillStartIso,
-      new Date(t),
-    );
+    const soFar = ordered.filter((x) => new Date(x.recorded_at).getTime() <= t);
+    const calcium = latestCalciumForFill(soFar, fillStartIso, new Date(t));
+    const cya = latestCyaForFill(soFar, fillStartIso, new Date(t));
     return {
       date: r.recorded_at,
       value: computeLsi({
         ph: toNum(r.ph),
         alkalinityPpm: toNum(r.total_alkalinity_ppm),
         calciumHardnessPpm: calcium?.valuePpm ?? null,
+        cyanuricAcidPpm: cya?.valuePpm ?? null,
         temperatureC: Number.isFinite(t) ? nearestTemp(t) : ASSUMED_TEMP_C,
       }),
     };
@@ -330,11 +418,11 @@ export function lsiSeries(
 
 // --- Where the app actually stands right now ---------------------------------
 //
-// One function assembles the whole picture from the three sources that hold the
+// One function assembles the whole picture from the sources that hold the
 // pieces — the last strip test (pH, alkalinity), whichever strip last measured
-// calcium during this fill, and the probe's latest temperature. Both the
-// dashboard card and the post-test result read from this, so they can never
-// disagree with each other.
+// calcium or stabiliser during this fill, and the probe's latest temperature.
+// Both the dashboard card and the post-test result read from this, so they can
+// never disagree with each other.
 export interface LsiSnapshot {
   lsi: number | null;
   verdict: LsiVerdict | null;
@@ -342,9 +430,18 @@ export interface LsiSnapshot {
   alkalinityPpm: number | null;
   calcium: CalciumSource | null;
   calciumIsStale: boolean;
+  /** Stabiliser, when a strip has measured it during this fill. */
+  cya: CalciumSource | null;
+  cyaIsStale: boolean;
+  /** Alkalinity with cyanurate taken out — what the index actually uses. */
+  carbonateAlkalinityPpm: number | null;
   temperatureC: number;
   /** False when we fell back to ASSUMED_TEMP_C instead of a probe reading. */
   temperatureIsMeasured: boolean;
+  /** True once CYA is known, i.e. the "errs early" caveat no longer applies. */
+  cyaCorrected: boolean;
+  /** Set when stabiliser has swallowed the whole alkalinity reading. */
+  overStabilised: boolean;
   /** Plain-English list of what's still needed, when `lsi` is null. */
   missing: string[];
 }
@@ -364,14 +461,8 @@ export function lsiSnapshot(
 
   const ph = toNum(latestReading?.ph ?? null);
   const alkalinityPpm = toNum(latestReading?.total_alkalinity_ppm ?? null);
-  const calcium = latestCalciumForFill(
-    readings.map((r) => ({
-      recorded_at: r.recorded_at,
-      calcium_hardness_ppm: r.calcium_hardness_ppm,
-    })),
-    fillStartIso,
-    now,
-  );
+  const calcium = latestCalciumForFill(readings, fillStartIso, now);
+  const cya = latestCyaForFill(readings, fillStartIso, now);
 
   const latestTemp = probeRows
     .map((p) => ({ t: new Date(p.measured_at).getTime(), c: toNum(p.temperature_c) }))
@@ -389,8 +480,28 @@ export function lsiSnapshot(
   if (calcium === null) {
     missing.push("a calcium hardness reading");
   }
+  // Not a missing input — a real result. Stabiliser has eaten the entire
+  // alkalinity reading, so there is no carbonate left to balance against.
+  if (
+    ph !== null &&
+    alkalinityPpm !== null &&
+    carbonateAlkalinity(alkalinityPpm, cya?.valuePpm ?? null, ph) <= 0
+  ) {
+    missing.push("fresh water — stabiliser has swallowed your whole alkalinity reading");
+  }
 
-  const lsi = computeLsi({ ph, alkalinityPpm, calciumHardnessPpm: calcium?.valuePpm ?? null, temperatureC });
+  const lsi = computeLsi({
+    ph,
+    alkalinityPpm,
+    calciumHardnessPpm: calcium?.valuePpm ?? null,
+    cyanuricAcidPpm: cya?.valuePpm ?? null,
+    temperatureC,
+  });
+
+  const carbonate =
+    ph === null || alkalinityPpm === null
+      ? null
+      : carbonateAlkalinity(alkalinityPpm, cya?.valuePpm ?? null, ph);
 
   return {
     lsi,
@@ -399,6 +510,11 @@ export function lsiSnapshot(
     alkalinityPpm,
     calcium,
     calciumIsStale: calcium !== null && calcium.ageDays > CALCIUM_STALE_DAYS,
+    cya,
+    cyaIsStale: cya !== null && cya.ageDays > CYA_STALE_DAYS,
+    carbonateAlkalinityPpm: carbonate === null ? null : Math.round(carbonate * 10) / 10,
+    cyaCorrected: cya !== null,
+    overStabilised: carbonate !== null && carbonate <= 0,
     temperatureC,
     temperatureIsMeasured: tempIsFresh,
     missing,
