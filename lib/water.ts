@@ -251,7 +251,13 @@ export interface WaterVerdict {
   headline: string;
   detail: string;
   /** Which signal drove the verdict, so the UI can explain itself. */
-  decidedBy: "age" | "usage" | "demand" | "sanitiser-ineffective" | "none";
+  decidedBy:
+    | "age"
+    | "usage"
+    | "demand"
+    | "sanitiser-ineffective"
+    | "stabiliser"
+    | "none";
 }
 
 export interface VerdictInput {
@@ -261,12 +267,30 @@ export interface VerdictInput {
   demand?: DemandTrend | null;
   /** True when ORP stays low even though pH is fine — classic stabiliser buildup. */
   sanitiserIneffective?: boolean;
+  /** A measured stabiliser reading, when a strip has provided one. */
+  cyaPpm?: number | null;
+  /** Above this, no amount of chlorine works and only fresh water helps. */
+  cyaDrainAbove?: number;
 }
 
 export function waterChangeVerdict(input: VerdictInput): WaterVerdict {
   const { ageDays, intervalDays, usage, demand, sanitiserIneffective } = input;
+  const cyaPpm = input.cyaPpm ?? null;
+  const cyaDrainAbove = input.cyaDrainAbove ?? 100;
 
   // 1. Hard signals first — these mean "change it", whatever the calendar says.
+  //
+  // A measured stabiliser reading outranks the ORP inference below. Both point
+  // at the same thing, but one is a number off a strip and the other is a
+  // pattern in a trend line, so when we have the number we say the number.
+  if (cyaPpm !== null && cyaPpm > cyaDrainAbove) {
+    return {
+      status: "change_now",
+      headline: "Time to change the water",
+      detail: `Your stabiliser reads ${cyaPpm} ppm. Above about ${cyaDrainAbove} ppm chlorine can't do its job however much you add, and nothing removes stabiliser except fresh water.`,
+      decidedBy: "stabiliser",
+    };
+  }
   if (sanitiserIneffective) {
     return {
       status: "change_now",

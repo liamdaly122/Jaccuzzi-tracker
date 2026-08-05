@@ -18,6 +18,8 @@ export interface TroubleshootReading {
   brominePpm: number | null;
   totalAlkalinityPpm: number | null;
   calciumHardnessPpm: number | null;
+  /** Stabiliser in ppm, from a strip that tests it. */
+  cyanuricAcidPpm?: number | null;
   // From the probe, when there is one. Only the saturation-index check uses it,
   // and that check falls back to the assumed spa temperature without it.
   temperatureC?: number | null;
@@ -94,6 +96,12 @@ const sanLow = (c: DiagnoseContext) => c.active != null && c.active < sanMin(c);
 const sanHigh = (c: DiagnoseContext) => c.active != null && c.active > sanMax(c);
 // The combination, not any single number. Scale can form with pH, alkalinity
 // and calcium all individually "in range" — this is the only check that sees it.
+// Measured, not inferred. The dashboard can only guess at stabiliser buildup
+// from an ORP trend; a strip reading settles it.
+const cyaTooHigh = (c: DiagnoseContext) =>
+  c.reading?.cyanuricAcidPpm != null &&
+  c.reading.cyanuricAcidPpm > c.config.targetRanges.cyaDrainAbove;
+
 const waterIsScaleForming = (c: DiagnoseContext) => {
   const lsi = computeLsi({
     ph: c.reading?.ph ?? null,
@@ -286,6 +294,13 @@ const SYMPTOMS: SymptomDef[] = [
     icon: "drain",
     blurb: "Chlorine or bromine keeps disappearing soon after you add it.",
     causes: [
+      {
+        cause: "Stabiliser has locked your chlorine out",
+        why: "Dichlor carries cyanuric acid in with every dose and nothing takes it back out, so it climbs all fill long. Past roughly 100 ppm it holds onto the chlorine so tightly that the chlorine can no longer sanitise — the test still shows a level, but the water isn't being disinfected.",
+        fix: "Drain and refill. No product removes stabiliser, and adding more chlorine makes it worse rather than better — this is the one problem you cannot dose your way out of.",
+        flagWhen: cyaTooHigh,
+        guideKey: "drain-and-refill-day",
+      },
       {
         cause: "High demand / contamination",
         why: "A lot of organic load (oils, sweat, leaves, a busy weekend) eats sanitizer as fast as you add it.",

@@ -79,6 +79,10 @@ export default async function DashboardPage() {
           latest.calcium_hardness_ppm === null
             ? null
             : Number(latest.calcium_hardness_ppm),
+        cyanuricAcidPpm:
+          latest.cyanuric_acid_ppm === null
+            ? null
+            : Number(latest.cyanuric_acid_ppm),
         orpMv: latest.orp_mv === null ? null : Number(latest.orp_mv),
         isFreshFill: latest.is_fresh_fill,
       },
@@ -144,13 +148,6 @@ export default async function DashboardPage() {
         Number(latest.ph) <= config.targetRanges.phIdealMax,
     );
 
-  const verdict = waterChangeVerdict({
-    ageDays: waterAgeDays,
-    intervalDays: waterChange.intervalDays,
-    usage: usageStatus,
-    demand,
-    sanitiserIneffective,
-  });
   const refillCost = estimateRefillCost(config.volumeLitres);
 
   // Live probe reading (hidden entirely when no key is configured, and the
@@ -184,6 +181,18 @@ export default async function DashboardPage() {
     drainTask?.last_completed_at ?? null,
     now,
   );
+
+  // Built after the balance snapshot so a measured stabiliser reading can
+  // outrank the ORP-drift inference.
+  const verdict = waterChangeVerdict({
+    ageDays: waterAgeDays,
+    intervalDays: waterChange.intervalDays,
+    usage: usageStatus,
+    demand,
+    sanitiserIneffective,
+    cyaPpm: balance.cya?.valuePpm ?? null,
+    cyaDrainAbove: config.targetRanges.cyaDrainAbove,
+  });
 
   // Weather (only when a location is set; fetch failures just hide the card).
   let weather: WeatherForecast | null = null;

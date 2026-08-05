@@ -247,3 +247,35 @@ describe("waterChangeVerdict", () => {
     expect(v.status).toBe("watch");
   });
 });
+
+describe("waterChangeVerdict — measured stabiliser", () => {
+  const fresh = { ageDays: 5, intervalDays: 90 };
+
+  it("calls a water change on a stabiliser reading alone", () => {
+    const v = waterChangeVerdict({ ...fresh, cyaPpm: 140, cyaDrainAbove: 100 });
+    expect(v.status).toBe("change_now");
+    expect(v.decidedBy).toBe("stabiliser");
+    expect(v.detail).toMatch(/140 ppm/);
+  });
+
+  it("prefers the measurement over the ORP inference", () => {
+    // Both fire; the strip number is the one the user can act on and check.
+    const v = waterChangeVerdict({
+      ...fresh,
+      cyaPpm: 140,
+      cyaDrainAbove: 100,
+      sanitiserIneffective: true,
+    });
+    expect(v.decidedBy).toBe("stabiliser");
+  });
+
+  it("still falls back to the inference when no strip has measured it", () => {
+    const v = waterChangeVerdict({ ...fresh, cyaPpm: null, sanitiserIneffective: true });
+    expect(v.decidedBy).toBe("sanitiser-ineffective");
+  });
+
+  it("leaves a healthy stabiliser level well alone", () => {
+    const v = waterChangeVerdict({ ...fresh, cyaPpm: 40, cyaDrainAbove: 100 });
+    expect(v.status).not.toBe("change_now");
+  });
+});

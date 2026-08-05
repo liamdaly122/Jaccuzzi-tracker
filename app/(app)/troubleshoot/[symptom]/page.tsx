@@ -66,6 +66,10 @@ export default async function SymptomPage({ params }: { params: Params }) {
           latest.calcium_hardness_ppm === null
             ? null
             : Number(latest.calcium_hardness_ppm),
+        cyanuricAcidPpm:
+          latest.cyanuric_acid_ppm === null
+            ? null
+            : Number(latest.cyanuric_acid_ppm),
         // The probe's latest water temperature, for the saturation-index check.
         temperatureC: await latestProbeTemperature(),
       };

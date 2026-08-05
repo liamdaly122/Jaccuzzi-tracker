@@ -137,7 +137,8 @@ function BalanceLine({ balance }: { balance: LsiSnapshot | null }) {
       ) : null}
       <p className="mt-2 text-xs text-slate-500">
         Saturation index {lsi > 0 ? "+" : ""}
-        {lsi.toFixed(2)}, from pH, alkalinity, calcium{" "}
+        {lsi.toFixed(2)}, from pH, alkalinity
+        {balance.cyaCorrected ? " (less stabiliser)" : ""}, calcium{" "}
         {balance.calcium?.valuePpm} ppm and{" "}
         {balance.temperatureC.toFixed(balance.temperatureIsMeasured ? 1 : 0)} °C
         {balance.temperatureIsMeasured ? "" : " (assumed)"}.

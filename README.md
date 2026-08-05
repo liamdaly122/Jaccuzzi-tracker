@@ -286,6 +286,15 @@ This uses a free service with no key needed.
   It needs a **calcium hardness** number, which your probe can't measure but
   most 6-in-1 strips can. Enter one every few weeks (calcium barely moves) and
   the card comes alive, with a matching chart on the Trends page.
+- **Stabiliser (cyanuric acid):** if your strip has a CYA pad, put the number in
+  too — the field sits just under calcium on the test form. It does two jobs.
+  It makes heater protection exact rather than approximate (your alkalinity
+  reading includes stabiliser, which doesn't actually take part in scaling, so
+  without this the app deliberately warns a little early). And it's the one
+  reading with **no chemical answer**: dichlor adds stabiliser with every dose,
+  nothing removes it, and past ~100 ppm chlorine stops working however much you
+  add. At that point the app stops suggesting doses and tells you plainly that
+  it's time to drain and refill.
 - **Test strips or a probe:** in Settings you can switch between **ppm** (test
   strips) and **ORP** (a probe such as an iopool, measured in millivolts). ORP
   measures whether your sanitiser is actually *working*, which is the better
@@ -319,6 +328,11 @@ less and retest.
 
 ## 🆘 Troubleshooting
 
+- **Saving a reading fails after an update added a new field.** A new field
+  needs a matching column in your database. Go to Supabase → **SQL Editor** →
+  **+ New query**, paste the whole of `supabase/schema.sql` again and click
+  **Run**. It's safe to re-run as many times as you like — it only ever adds
+  what's missing and never touches your existing data.
 - **The app says "one setup step left."** The app can't reach the database.
   Double-check you ran `supabase/schema.sql` (Part A5) and that `SUPABASE_URL`
   and `SUPABASE_SERVICE_ROLE_KEY` are pasted correctly in Vercel (no extra

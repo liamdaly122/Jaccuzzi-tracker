@@ -125,12 +125,46 @@ export default function HeaterProtectionCard({
 }: {
   snapshot: LsiSnapshot;
 }) {
-  const { lsi, verdict, calcium, calciumIsStale, temperatureC, temperatureIsMeasured } =
-    snapshot;
+  const {
+    lsi,
+    verdict,
+    calcium,
+    calciumIsStale,
+    cya,
+    cyaIsStale,
+    cyaCorrected,
+    carbonateAlkalinityPpm,
+    overStabilised,
+    temperatureC,
+    temperatureIsMeasured,
+  } = snapshot;
 
   // Nothing to show until there's at least a water test — the dashboard already
   // has a "get started" hero for that case.
   if (snapshot.ph === null || snapshot.alkalinityPpm === null) return null;
+
+  if (overStabilised) {
+    return (
+      <Card>
+        <h2 className="mb-1 flex items-center gap-2 font-semibold text-slate-800">
+          <Icon name="thermometer" size={18} className="text-brand-600" />
+          Heater protection
+        </h2>
+        <div className="rounded-xl bg-red-50 p-3">
+          <p className="flex items-center gap-2 font-semibold text-red-800">
+            <Icon name="alert-triangle" size={17} />
+            Change the water
+          </p>
+          <p className="mt-1 text-sm text-red-800">
+            Your stabiliser reading ({cya?.valuePpm} ppm) accounts for your
+            entire alkalinity reading, so there&apos;s no carbonate left to
+            balance against — and nothing removes stabiliser except fresh water.
+            I can&apos;t give you a meaningful heater reading until you refill.
+          </p>
+        </div>
+      </Card>
+    );
+  }
 
   if (lsi === null || verdict === null) {
     // The user's normal state between strip tests: the probe measures pH, ORP
@@ -201,7 +235,11 @@ export default function HeaterProtectionCard({
 
       <p className="mt-3 text-xs text-slate-400">
         Worked out from your last test (pH {snapshot.ph.toFixed(1)}, alkalinity{" "}
-        {Math.round(snapshot.alkalinityPpm)} ppm), calcium {calcium?.valuePpm} ppm
+        {Math.round(snapshot.alkalinityPpm)} ppm
+        {cyaCorrected && carbonateAlkalinityPpm !== null
+          ? ` less ${Math.round(snapshot.alkalinityPpm - carbonateAlkalinityPpm)} ppm of stabiliser = ${Math.round(carbonateAlkalinityPpm)} ppm carbonate`
+          : ""}
+        ), calcium {calcium?.valuePpm} ppm
         {calcium && calcium.ageDays > 0
           ? ` measured ${calcium.ageDays} day${calcium.ageDays === 1 ? "" : "s"} ago`
           : ""}
@@ -216,9 +254,17 @@ export default function HeaterProtectionCard({
         </p>
       ) : null}
 
+      {cyaIsStale ? (
+        <p className="mt-1 text-xs text-amber-700">
+          Your stabiliser reading is over a fortnight old, and dichlor pushes it
+          up with every dose — worth a fresh strip test.
+        </p>
+      ) : null}
+
       <p className="mt-1 text-xs text-slate-400">
-        Guidance, not gospel: without a stabiliser (CYA) test this errs slightly
-        towards warning about scale early — the safe direction for a heater.
+        {cyaCorrected
+          ? `Guidance, not gospel — but with your stabiliser reading (${cya?.valuePpm} ppm) subtracted, this is the full calculation rather than an approximation.`
+          : "Guidance, not gospel: without a stabiliser (CYA) test this errs slightly towards warning about scale early — the safe direction for a heater."}
       </p>
     </Card>
   );

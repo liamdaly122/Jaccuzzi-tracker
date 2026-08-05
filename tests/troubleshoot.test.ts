@@ -171,3 +171,36 @@ describe("diagnose", () => {
     expect(d1.causes.map((c) => c.cause)).toEqual(d2.causes.map((c) => c.cause));
   });
 });
+
+describe("won't hold sanitizer — measured stabiliser", () => {
+  const reading = (cya: number | null): TroubleshootReading => ({
+    ph: 7.5,
+    freeChlorinePpm: 3,
+    brominePpm: null,
+    totalAlkalinityPpm: 100,
+    calciumHardnessPpm: 150,
+    cyanuricAcidPpm: cya,
+  });
+
+  it("flags chlorine lock and leads with it", () => {
+    const d = diagnose("wont_hold_sanitizer", reading(140), chlorineConfig)!;
+    expect(d.causes[0].cause).toMatch(/stabiliser/i);
+    expect(d.causes[0].flagged).toBe(true);
+    // The one problem you cannot dose your way out of — say so.
+    expect(d.causes[0].fix).toMatch(/drain/i);
+  });
+
+  it("stays quiet at a healthy stabiliser level", () => {
+    const d = diagnose("wont_hold_sanitizer", reading(40), chlorineConfig)!;
+    expect(d.causes.some((c) => /stabiliser has locked/i.test(c.cause) && c.flagged)).toBe(
+      false,
+    );
+  });
+
+  it("does not guess when the strip never measured it", () => {
+    const d = diagnose("wont_hold_sanitizer", reading(null), chlorineConfig)!;
+    expect(d.causes.some((c) => /stabiliser has locked/i.test(c.cause) && c.flagged)).toBe(
+      false,
+    );
+  });
+});
