@@ -28,6 +28,8 @@ const rangeFields: { key: keyof TargetRanges; label: string }[] = [
   { key: "brMax", label: "Bromine max" },
   { key: "chMin", label: "Calcium min" },
   { key: "chMax", label: "Calcium max" },
+  { key: "cyaMin", label: "Stabiliser min" },
+  { key: "cyaMax", label: "Stabiliser max" },
 ];
 
 const constantFields: { key: keyof DosingConstants; label: string }[] = [

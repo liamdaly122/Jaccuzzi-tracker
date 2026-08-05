@@ -37,6 +37,7 @@ export default function ReadingForm({
   const [ta, setTa] = useState("");
   const [sanitizer, setSanitizer] = useState("");
   const [calcium, setCalcium] = useState("");
+  const [cya, setCya] = useState("");
   const [orp, setOrp] = useState("");
   const [isFreshFill, setIsFreshFill] = useState(false);
   const [notes, setNotes] = useState("");
@@ -68,6 +69,7 @@ export default function ReadingForm({
       freeChlorinePpm: sanitizerType === "chlorine" ? num(sanitizer) : null,
       brominePpm: sanitizerType === "bromine" ? num(sanitizer) : null,
       calciumHardnessPpm: num(calcium),
+      cyanuricAcidPpm: num(cya),
       orpMv: num(orp),
       isFreshFill,
       notes: notes.trim() || null,
@@ -103,6 +105,7 @@ export default function ReadingForm({
     setTa("");
     setSanitizer("");
     setCalcium("");
+    setCya("");
     setOrp("");
     setIsFreshFill(false);
     setNotes("");
@@ -174,6 +177,8 @@ export default function ReadingForm({
                 if (san != null) setSanitizer(String(san));
                 if (v.calciumHardnessPpm != null)
                   setCalcium(String(v.calciumHardnessPpm));
+                if (v.cyanuricAcidPpm != null)
+                  setCya(String(v.cyanuricAcidPpm));
               }}
             />
             <p className="mt-2 text-center text-xs text-slate-400">
@@ -256,6 +261,20 @@ export default function ReadingForm({
               inputMode="decimal"
               value={calcium}
               onChange={(e) => setCalcium(e.target.value)}
+              className={inputClass}
+              placeholder="optional"
+            />
+          </Field>
+
+          <Field
+            label="Stabiliser / cyanuric acid (ppm) — optional"
+            hint={`Aim for ${targetRanges.cyaMin ?? 20}–${targetRanges.cyaMax ?? 50}. Leave blank if your strip doesn't test it. Only needed every few weeks.`}
+          >
+            <input
+              type="number"
+              inputMode="decimal"
+              value={cya}
+              onChange={(e) => setCya(e.target.value)}
               className={inputClass}
               placeholder="optional"
             />

@@ -39,6 +39,12 @@ export interface TargetRanges {
   brMax: number;
   chMin: number;
   chMax: number;
+  // Cyanuric acid (stabiliser). A spa needs far less than a pool — there's no
+  // sunlight to protect against indoors and the volume is tiny, so it climbs
+  // fast on dichlor. Above cyaDrainAbove the only fix is fresh water.
+  cyaMin: number;
+  cyaMax: number;
+  cyaDrainAbove: number;
   // ORP (mV) — WHO puts the effective-sanitiser floor at 650; 650-750 is the
   // usual domestic target, and very high readings are harsh on skin and eyes.
   orpMin: number;
@@ -76,6 +82,8 @@ export interface TestReadingInput {
   brominePpm?: number | null;
   totalAlkalinityPpm: number;
   calciumHardnessPpm?: number | null;
+  /** Cyanuric acid / stabiliser in ppm, from a strip that tests it. */
+  cyanuricAcidPpm?: number | null;
   /** Millivolts from an ORP probe, when the user has one. */
   orpMv?: number | null;
   isFreshFill?: boolean;
@@ -125,6 +133,9 @@ export const DEFAULT_TARGET_RANGES: TargetRanges = {
   brMax: 5,
   chMin: 100,
   chMax: 250,
+  cyaMin: 20,
+  cyaMax: 50,
+  cyaDrainAbove: 100,
   orpMin: 650,
   orpMax: 750,
   orpDangerHigh: 850,
@@ -666,6 +677,56 @@ function calciumFlag(
   };
 }
 
+// Cyanuric acid — the one reading with no chemical answer.
+//
+// Dichlor carries stabiliser in with every dose, and nothing except fresh water
+// takes it back out. Left to climb it does two things at once: it suppresses ORP
+// so the sanitiser stops working ("chlorine lock"), and it inflates the
+// alkalinity reading so the water looks better balanced than it is (see
+// lib/balance.ts). So this flag never offers a dose — it tells you where you are
+// on the road to a water change.
+function cyaFlag(
+  reading: TestReadingInput,
+  config: SpaConfig,
+): Recommendation | null {
+  const cya = reading.cyanuricAcidPpm;
+  if (cya === null || cya === undefined) return null;
+
+  const { cyaMin, cyaMax, cyaDrainAbove } = config.targetRanges;
+
+  if (cya > cyaDrainAbove) {
+    return {
+      chemical: null,
+      label: "Stabiliser too high — change the water",
+      amountGrams: null,
+      instructions: `Stabiliser is ${cya} ppm (aim for ${cyaMin}–${cyaMax}). At this level chlorine struggles to work however much you add, and no product removes stabiliser — draining and refilling is the only fix. Your sanitiser readings can't be trusted until you do.`,
+      severity: "high",
+      order: 6,
+    };
+  }
+  if (cya > cyaMax) {
+    return {
+      chemical: null,
+      label: "Stabiliser getting high",
+      amountGrams: null,
+      instructions: `Stabiliser is ${cya} ppm (aim for ${cyaMin}–${cyaMax}). It only goes up while you're using dichlor, and the only way down is fresh water — so treat this as your water change getting closer rather than something to dose for.`,
+      severity: "low",
+      order: 6,
+    };
+  }
+  if (cya < cyaMin) {
+    return {
+      chemical: null,
+      label: "Stabiliser low",
+      amountGrams: null,
+      instructions: `Stabiliser is ${cya} ppm (aim for ${cyaMin}–${cyaMax}). Not a problem for a covered indoor spa — it mainly protects chlorine from sunlight — and dichlor will raise it on its own with normal use.`,
+      severity: "info",
+      order: 6,
+    };
+  }
+  return null;
+}
+
 // -----------------------------------------------------------------------------
 // Public entry point. Runs the steps in real-world dosing order and returns an
 // ordered list of recommendations plus any safety flags.
@@ -693,6 +754,9 @@ export function calculateRecommendations(
 
   const ch = calciumFlag(reading, config);
   if (ch) recommendations.push(ch);
+
+  const cya = cyaFlag(reading, config);
+  if (cya) recommendations.push(cya);
 
   // Keep the canonical dosing order stable regardless of input shape.
   recommendations.sort((a, b) => a.order - b.order);

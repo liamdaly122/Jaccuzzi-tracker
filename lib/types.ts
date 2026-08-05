@@ -36,6 +36,7 @@ export interface TestReadingRow {
   bromine_ppm: number | null;
   total_alkalinity_ppm: number;
   calcium_hardness_ppm: number | null;
+  cyanuric_acid_ppm: number | null;
   orp_mv: number | null;
   is_fresh_fill: boolean;
   notes: string | null;

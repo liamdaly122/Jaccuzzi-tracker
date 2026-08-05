@@ -16,6 +16,7 @@ export interface RawScan {
   freeChlorinePpm?: number | string | null;
   brominePpm?: number | string | null;
   calciumHardnessPpm?: number | string | null;
+  cyanuricAcidPpm?: number | string | null;
 }
 
 export interface NormalizedScan {
@@ -24,6 +25,7 @@ export interface NormalizedScan {
   freeChlorinePpm: number | null;
   brominePpm: number | null;
   calciumHardnessPpm: number | null;
+  cyanuricAcidPpm: number | null;
 }
 
 // Plausible ranges a real hot-tub test strip can display. Values outside these
@@ -34,6 +36,8 @@ const BOUNDS = {
   freeChlorinePpm: { min: 0, max: 20, decimals: 1 },
   brominePpm: { min: 0, max: 40, decimals: 1 },
   calciumHardnessPpm: { min: 0, max: 1000, decimals: 0 },
+  // Strips print up to ~300; beyond that is a misread, not a measurement.
+  cyanuricAcidPpm: { min: 0, max: 300, decimals: 0 },
 } as const;
 
 function clampField(
@@ -67,5 +71,6 @@ export function normalizeScan(
     freeChlorinePpm: config.sanitizerType === "chlorine" ? chlorine : null,
     brominePpm: config.sanitizerType === "bromine" ? bromine : null,
     calciumHardnessPpm: clampField(r.calciumHardnessPpm, BOUNDS.calciumHardnessPpm),
+    cyanuricAcidPpm: clampField(r.cyanuricAcidPpm, BOUNDS.cyanuricAcidPpm),
   };
 }

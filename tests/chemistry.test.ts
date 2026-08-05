@@ -221,6 +221,46 @@ describe("bromine sanitizer", () => {
   });
 });
 
+describe("cyanuric acid / stabiliser", () => {
+  const withCya = (cya: number | null) =>
+    calculateRecommendations(
+      { ...balanced, cyanuricAcidPpm: cya },
+      chlorineConfig(),
+    );
+  const cyaRec = (cya: number | null) =>
+    withCya(cya).recommendations.find((r) => /stabiliser/i.test(r.label));
+
+  it("says nothing when the strip has no stabiliser pad", () => {
+    expect(cyaRec(null)).toBeUndefined();
+  });
+
+  it("says nothing when it's in range", () => {
+    expect(cyaRec(35)).toBeUndefined();
+  });
+
+  it("escalates as it climbs, and never offers a dose", () => {
+    // There is no product that removes stabiliser, so a gram figure here would
+    // be a lie whatever the level.
+    for (const level of [10, 70, 150]) {
+      expect(cyaRec(level)?.amountGrams ?? null).toBeNull();
+      expect(cyaRec(level)?.chemical ?? null).toBeNull();
+    }
+    expect(cyaRec(10)!.severity).toBe("info"); // low is harmless in a covered spa
+    expect(cyaRec(70)!.severity).toBe("low"); // heading for a water change
+    expect(cyaRec(150)!.severity).toBe("high"); // chlorine can't work
+  });
+
+  it("names fresh water as the only fix once it's past the drain threshold", () => {
+    const r = cyaRec(150)!;
+    expect(r.instructions).toMatch(/drain|fresh water/i);
+    expect(r.instructions).toMatch(/no product removes|only fix/i);
+  });
+
+  it("counts as something to act on, unlike a merely informational note", () => {
+    expect(withCya(150).summary).toMatch(/adjust|do not use/i);
+  });
+});
+
 describe("calcium hardness (optional)", () => {
   it("produces no flag when the field is omitted", () => {
     const result = calculateRecommendations(balanced, chlorineConfig());

@@ -19,6 +19,7 @@ describe("normalizeScan", () => {
       freeChlorinePpm: 3,
       brominePpm: null,
       calciumHardnessPpm: 150,
+      cyanuricAcidPpm: null,
     });
   });
 
@@ -85,7 +86,26 @@ describe("normalizeScan", () => {
       freeChlorinePpm: null,
       brominePpm: null,
       calciumHardnessPpm: null,
+      cyanuricAcidPpm: null,
     });
     expect(normalizeScan(undefined, bromine).ph).toBeNull();
+  });
+});
+
+describe("cyanuric acid pad", () => {
+  it("passes a plausible stabiliser reading through", () => {
+    expect(
+      normalizeScan({ ph: 7.5, cyanuricAcidPpm: 45 }, chlorine).cyanuricAcidPpm,
+    ).toBe(45);
+  });
+
+  it("drops a misread that no strip could actually show", () => {
+    expect(
+      normalizeScan({ cyanuricAcidPpm: 5000 }, chlorine).cyanuricAcidPpm,
+    ).toBeNull();
+  });
+
+  it("is null when the strip has no stabiliser pad", () => {
+    expect(normalizeScan({ ph: 7.5 }, chlorine).cyanuricAcidPpm).toBeNull();
   });
 });

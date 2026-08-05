@@ -37,7 +37,8 @@ create table if not exists spa_settings (
     "taMin": 80, "taMax": 120,
     "fcMin": 3, "fcMax": 5,
     "brMin": 3, "brMax": 5,
-    "chMin": 100, "chMax": 250
+    "chMin": 100, "chMax": 250,
+    "cyaMin": 20, "cyaMax": 50
   }'::jsonb,
   dosing_constants jsonb not null default '{
     "taIncreaserGPer1000LPer10Ppm": 24,
@@ -73,6 +74,12 @@ alter table spa_settings
 
 -- ORP / disinfection potential in millivolts, for probe users.
 alter table test_readings add column if not exists orp_mv numeric(6, 1);
+
+-- Cyanuric acid (stabiliser), from a strip that tests it. Feeds the saturation
+-- index (only carbonate alkalinity counts towards scaling) and the
+-- chlorine-lock check. No default: absent means "not measured", which is a
+-- different thing from a measured zero.
+alter table test_readings add column if not exists cyanuric_acid_ppm numeric(6, 1);
 
 -- -----------------------------------------------------------------------------
 -- probe_readings: automatic history from an iopool probe (pH / ORP / temp).
@@ -112,6 +119,7 @@ create table if not exists test_readings (
   bromine_ppm numeric(5, 2),
   total_alkalinity_ppm numeric(6, 2) not null,
   calcium_hardness_ppm numeric(6, 2),
+  cyanuric_acid_ppm numeric(6, 1),
   is_fresh_fill boolean not null default false,
   notes text,
   created_at timestamptz not null default now()

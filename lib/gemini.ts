@@ -42,6 +42,7 @@ function responseSchema(sanitizerType: SanitizerType) {
     ph: { type: "NUMBER", nullable: true },
     totalAlkalinityPpm: { type: "NUMBER", nullable: true },
     calciumHardnessPpm: { type: "NUMBER", nullable: true },
+    cyanuricAcidPpm: { type: "NUMBER", nullable: true },
   };
   if (sanitizerType === "chlorine") {
     properties.freeChlorinePpm = { type: "NUMBER", nullable: true };
@@ -64,6 +65,7 @@ function buildPrompt(sanitizerType: SanitizerType): string {
     "- totalAlkalinityPpm: the total alkalinity pad, in ppm (typical values 0, 40, 80, 120, 180, 240).",
     sanitizerLine,
     "- calciumHardnessPpm: the calcium / total hardness pad, in ppm, if the strip has one; otherwise null.",
+    "- cyanuricAcidPpm: the cyanuric acid / stabiliser / CYA pad, in ppm, if the strip has one; otherwise null.",
     "Only report a value if you can actually see the matching pad. Accuracy matters more than completeness.",
   ].join("\n");
 }
