@@ -295,6 +295,16 @@ This uses a free service with no key needed.
   nothing removes it, and past ~100 ppm chlorine stops working however much you
   add. At that point the app stops suggesting doses and tells you plainly that
   it's time to drain and refill.
+- **Winter shutdown (Upkeep screen):** from about three months out, a countdown
+  bar appears showing when to shut the tub down for the cold months, worked out
+  from where you live — and it jumps forward if a frost actually turns up in the
+  forecast. It compares what each option costs: leaving it running on Freeze
+  Shield all winter, versus packing it away (nothing all winter, plus one refill
+  in spring). Pick one and the app goes quiet until you wake it up — no more
+  reminders to test water that isn't there. If the tub is staying outside, frost
+  warnings carry on regardless. There's a full step-by-step guide for packing it
+  away and another for getting it back out in spring, and both remember your
+  ticks between sessions, because the job spans a weekend.
 - **Test strips or a probe:** in Settings you can switch between **ppm** (test
   strips) and **ORP** (a probe such as an iopool, measured in millivolts). ORP
   measures whether your sanitiser is actually *working*, which is the better

@@ -75,6 +75,14 @@ function dayOfYearToDate(year: number, dayOfYear: number): Date {
   return new Date(Date.UTC(year, 0, 1) + (dayOfYear - 1) * DAY_MS);
 }
 
+// Reopening always belongs to the winter it follows, never the one before it.
+function reopenAfter(deadline: Date, year: number, reopenDay: number): Date {
+  const same = dayOfYearToDate(year, reopenDay);
+  return same.getTime() > deadline.getTime()
+    ? same
+    : dayOfYearToDate(year + 1, reopenDay);
+}
+
 const startOfDayUtc = (d: Date): Date =>
   new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
 
@@ -110,20 +118,22 @@ export function winterWindow(
     reopenDay += SOUTHERN_SHIFT_DAYS;
   }
 
-  // Pick the next deadline that hasn't already passed, so the card rolls over
-  // to next season the moment this one is behind us.
+  // Find the season we are actually IN, which is not the same as the next
+  // deadline in the future. Once the deadline passes in November, the right
+  // answer all winter is still "you're overdue" — rolling forward to next
+  // year's date would make the warning vanish at the exact moment the tub is
+  // sitting outside full of water. So a season runs from its deadline through
+  // to the following spring, and only then do we move on to the next one.
   const today = startOfDayUtc(now);
-  let year = today.getUTCFullYear();
+  let year = today.getUTCFullYear() - 1;
   let deadline = dayOfYearToDate(year, shutdownDay);
-  if (deadline.getTime() < today.getTime()) {
+  let reopen = reopenAfter(deadline, year, reopenDay);
+
+  // Advance until this season's reopening is still ahead of us.
+  for (let i = 0; i < 4 && reopen.getTime() < today.getTime(); i += 1) {
     year += 1;
     deadline = dayOfYearToDate(year, shutdownDay);
-  }
-
-  // Reopening is the one that follows this deadline, not the one before it.
-  let reopen = dayOfYearToDate(year, reopenDay);
-  if (reopen.getTime() <= deadline.getTime()) {
-    reopen = dayOfYearToDate(year + 1, reopenDay);
+    reopen = reopenAfter(deadline, year, reopenDay);
   }
 
   return {

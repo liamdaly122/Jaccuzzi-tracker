@@ -49,12 +49,24 @@ describe("winterWindow", () => {
     expect(winterWindow(Number.NaN, AUG)).toBeNull();
   });
 
-  it("rolls on to next year once this year's deadline has passed", () => {
-    const december = new Date("2026-12-20T12:00:00.000Z");
-    const w = winterWindow(LEEDS, december)!;
-    expect(w.deadline.getUTCFullYear()).toBe(2027);
-    // Reopening always follows the deadline it belongs to.
-    expect(w.reopen.getTime()).toBeGreaterThan(w.deadline.getTime());
+  it("keeps pointing at the deadline you missed, all winter long", () => {
+    // The tempting bug: roll to next year's date the moment this year's passes.
+    // That makes the warning disappear in December — precisely when a full tub
+    // is sitting outside in the frost. The season runs until spring.
+    for (const d of ["2026-11-10", "2026-12-20", "2027-01-15", "2027-03-01"]) {
+      const w = winterWindow(LEEDS, new Date(`${d}T12:00:00.000Z`))!;
+      expect(iso(w.deadline)).toBe("2026-11-02");
+      expect(winterCountdown(w, new Date(`${d}T12:00:00.000Z`))!.status).toBe(
+        "overdue",
+      );
+    }
+  });
+
+  it("moves on to the next winter once spring has arrived", () => {
+    const may = new Date("2027-05-10T12:00:00.000Z");
+    const w = winterWindow(LEEDS, may)!;
+    expect(iso(w.deadline)).toBe("2027-11-02");
+    expect(winterCountdown(w, may)!.status).toBe("not_yet");
   });
 
   it("always reopens after it shuts down", () => {

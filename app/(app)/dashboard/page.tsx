@@ -33,6 +33,7 @@ import {
 } from "@/lib/water";
 import { buildForecasts } from "@/lib/predict";
 import { lsiSnapshot } from "@/lib/balance";
+import { hibernationState, winterWindow } from "@/lib/winter";
 import { getForecast, weatherAdvice, type WeatherForecast } from "@/lib/weather";
 import { getIopoolReading, isIopoolConfigured } from "@/lib/iopool";
 import { orpDrift } from "@/lib/probe";
@@ -64,6 +65,17 @@ export default async function DashboardPage() {
 
   const now = new Date();
   const config = toSpaConfig(settings);
+
+  // Packed away for the winter: none of what follows is about water that
+  // exists, so show a calm panel instead of a dashboard full of stale numbers.
+  const hibernation = hibernationState(
+    settings.winterised_at ?? null,
+    settings.winter_strategy ?? null,
+    winterWindow(settings.latitude === null ? null : Number(settings.latitude), now),
+  );
+  if (hibernation.hibernating) {
+    return <HibernatingDashboard hibernation={hibernation} />;
+  }
 
   // Latest reading's safety status for the top banner.
   let calc = null;
@@ -552,6 +564,69 @@ function Metric({
         {value === null || value === undefined ? "—" : value}
       </div>
       <div className="text-xs text-slate-500">{label}</div>
+    </div>
+  );
+}
+
+// A deliberately quiet screen. The tub is away; there is nothing to do and
+// nothing to worry about, and the app should look like it knows that.
+function HibernatingDashboard({
+  hibernation,
+}: {
+  hibernation: ReturnType<typeof hibernationState>;
+}) {
+  const fmt = (d: Date) =>
+    d.toLocaleDateString("en-GB", { day: "numeric", month: "long" });
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <h1 className="text-2xl font-bold text-slate-800">Today</h1>
+        <p className="text-sm text-slate-500">Your hot tub is put away for winter.</p>
+      </div>
+
+      <Card className="border-brand-200 bg-gradient-to-br from-slate-50 to-white">
+        <div className="flex items-center gap-3">
+          <Icon name="moon" size={36} className="text-brand-600" />
+          <div>
+            <p className="font-bold text-slate-800">Hibernating</p>
+            <p className="text-sm text-slate-600">
+              {hibernation.since ? `Shut down on ${fmt(hibernation.since)}. ` : ""}
+              Nothing to test, nothing due.
+            </p>
+          </div>
+        </div>
+        {hibernation.reopen ? (
+          <p className="mt-3 text-sm text-slate-600">
+            I&apos;ll be here when you want it back — around{" "}
+            <strong>{fmt(hibernation.reopen)}</strong> is usually about right.
+          </p>
+        ) : null}
+        {hibernation.stillOutdoors ? (
+          <p className="mt-3 flex items-start gap-2 rounded-xl bg-amber-50 p-2.5 text-xs text-amber-900">
+            <Icon name="snowflake" size={14} className="mt-0.5 shrink-0" />
+            <span>
+              It&apos;s still outside, so I&apos;m keeping an eye on the forecast
+              and will warn you about a hard frost.
+            </span>
+          </p>
+        ) : null}
+      </Card>
+
+      <Card>
+        <Link
+          href="/tasks"
+          className="flex items-center justify-between font-medium text-slate-700"
+        >
+          <span className="flex items-center gap-2.5">
+            <Icon name="sun" size={20} className="text-brand-600" />
+            Wake it up for the season
+          </span>
+          <span className="text-brand-600">→</span>
+        </Link>
+      </Card>
+
+      <QuickLinks />
     </div>
   );
 }

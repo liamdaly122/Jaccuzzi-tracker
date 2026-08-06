@@ -3,8 +3,18 @@ import Icon from "@/components/Icon";
 import CompleteButton from "@/components/CompleteButton";
 import FrequencyEditor from "@/components/FrequencyEditor";
 import { Badge, Card } from "@/components/ui";
-import { getTasks, toTaskLike } from "@/lib/data";
+import WinterCard from "@/components/WinterCard";
+import { getTasks, toTaskLike, getSettings, toSpaConfig } from "@/lib/data";
 import { computeTaskLife } from "@/lib/tasks";
+import { getForecast } from "@/lib/weather";
+import { estimateRefillCost } from "@/lib/water";
+import {
+  compareWinterCosts,
+  hibernationState,
+  winterCountdown,
+  winterLengthDays,
+  winterWindow,
+} from "@/lib/winter";
 import {
   dueStatusLabel,
   dueStatusTone,
@@ -16,9 +26,9 @@ import {
 export const dynamic = "force-dynamic";
 
 export default async function TasksPage() {
-  let tasks;
+  let tasks, settings;
   try {
-    tasks = await getTasks();
+    [tasks, settings] = await Promise.all([getTasks(), getSettings()]);
   } catch (err) {
     return (
       <SetupNeeded message={err instanceof Error ? err.message : "Unknown error"} />
@@ -30,6 +40,40 @@ export default async function TasksPage() {
     .map((t) => ({ row: t, life: computeTaskLife(toTaskLike(t), now) }))
     .sort((a, b) => a.life.daysUntilDue - b.life.daysUntilDue);
 
+  // --- Winter shutdown -------------------------------------------------------
+  const config = toSpaConfig(settings);
+  const latitude = settings.latitude === null ? null : Number(settings.latitude);
+  const window = winterWindow(latitude, now);
+  const hibernation = hibernationState(
+    settings.winterised_at ?? null,
+    settings.winter_strategy ?? null,
+    window,
+  );
+
+  // Only fetch a forecast when it could actually change the advice — no point
+  // calling out in June, or once the tub is already packed away.
+  let forecastDays: { date: string; tempMin: number }[] = [];
+  if (
+    !hibernation.hibernating &&
+    window &&
+    settings.latitude != null &&
+    settings.longitude != null
+  ) {
+    const weather = await getForecast(
+      Number(settings.latitude),
+      Number(settings.longitude),
+      settings.location_name ?? undefined,
+    );
+    forecastDays = weather?.days.map((d) => ({ date: d.date, tempMin: d.tempMin })) ?? [];
+  }
+
+  const countdown = winterCountdown(window, now, forecastDays);
+  const costs = window
+    ? compareWinterCosts(config.volumeLitres, winterLengthDays(window), {
+        refillCost: estimateRefillCost(config.volumeLitres).totalCost,
+      })
+    : null;
+
   return (
     <div className="space-y-4">
       <div>
@@ -39,6 +83,13 @@ export default async function TasksPage() {
           refill it — the next date updates automatically.
         </p>
       </div>
+
+      <WinterCard
+        window={window}
+        countdown={countdown}
+        costs={costs}
+        hibernation={hibernation}
+      />
 
       <div className="space-y-3">
         {withLife.map(({ row, life }) => {

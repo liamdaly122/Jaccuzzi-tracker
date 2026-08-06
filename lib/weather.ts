@@ -28,6 +28,10 @@ export interface WeatherAdvisory {
 
 // Thresholds (°C / UV index / mm) — tuned for a garden hot tub.
 export const FROST_C = 2;
+// The forecast now runs 14 days so the winter-shutdown countdown can see a cold
+// snap coming. Day-to-day advice ("keep the cover on") stays on the near horizon
+// though — warning about frost a fortnight out is just noise.
+export const ADVICE_HORIZON_DAYS = 3;
 export const HEAT_C = 28;
 export const HIGH_UV = 7;
 export const HEAVY_RAIN_MM = 10;
@@ -40,7 +44,9 @@ export function weatherAdvice(
   sanitizerType: SanitizerType,
 ): WeatherAdvisory[] {
   const advisories: WeatherAdvisory[] = [];
-  const days = forecast.days.filter((d) => Number.isFinite(d.tempMax));
+  const days = forecast.days
+    .filter((d) => Number.isFinite(d.tempMax))
+    .slice(0, ADVICE_HORIZON_DAYS);
   if (days.length === 0) return advisories;
 
   const sanitizer = sanitizerType === "chlorine" ? "chlorine" : "bromine";
@@ -139,7 +145,7 @@ export async function getForecast(
   const url =
     `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}` +
     "&daily=temperature_2m_max,temperature_2m_min,uv_index_max,precipitation_sum" +
-    "&forecast_days=3&timezone=auto";
+    "&forecast_days=14&timezone=auto";
   const data = (await fetchJson(url, 3600)) as
     | {
         daily?: {

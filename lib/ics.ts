@@ -49,9 +49,20 @@ function escapeText(text: string): string {
 
 const CRLF = "\r\n";
 
+// A once-a-year event that isn't driven by a completion cadence — the winter
+// shutdown lands on a seasonal date, so it repeats YEARLY rather than every N
+// days. (INTERVAL=365 would drift a day every leap year.)
+export interface IcsSeasonalEvent {
+  key: string;
+  name: string;
+  date: Date;
+  description: string;
+}
+
 export function buildIcsFeed(
   tasks: IcsTask[],
   now: Date = new Date(),
+  seasonal: IcsSeasonalEvent[] = [],
 ): string {
   const stamp = formatStamp(now);
 
@@ -90,6 +101,29 @@ export function buildIcsFeed(
       `DESCRIPTION:${escapeText(
         `Hot tub maintenance: ${task.name}. Every ${task.frequencyDays} day(s).`,
       )}`,
+      "END:VEVENT",
+    );
+  }
+
+  for (const event of seasonal) {
+    const start = new Date(
+      Date.UTC(
+        event.date.getUTCFullYear(),
+        event.date.getUTCMonth(),
+        event.date.getUTCDate(),
+      ),
+    );
+    const end = new Date(start.getTime() + 24 * 60 * 60 * 1000);
+
+    lines.push(
+      "BEGIN:VEVENT",
+      `UID:${event.key}@hot-tub-tracker`,
+      `DTSTAMP:${stamp}`,
+      `DTSTART;VALUE=DATE:${formatDate(start)}`,
+      `DTEND;VALUE=DATE:${formatDate(end)}`,
+      "RRULE:FREQ=YEARLY",
+      `SUMMARY:${escapeText("🛁 " + event.name)}`,
+      `DESCRIPTION:${escapeText(event.description)}`,
       "END:VEVENT",
     );
   }

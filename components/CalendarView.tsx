@@ -35,7 +35,22 @@ export interface CalendarTask {
 const UPCOMING_WINDOW_DAYS = 90;
 const UPCOMING_COUNT = 10;
 
-export default function CalendarView({ tasks }: { tasks: CalendarTask[] }) {
+// Seasonal one-a-year markers (winter shutdown, spring reopen). They aren't
+// maintenance tasks — they have no completion cadence — so they arrive
+// separately and get folded into the same day map.
+export interface SeasonalMarker {
+  key: string;
+  name: string;
+  date: string;
+}
+
+export default function CalendarView({
+  tasks,
+  seasonal = [],
+}: {
+  tasks: CalendarTask[];
+  seasonal?: SeasonalMarker[];
+}) {
   const now = useMemo(() => new Date(), []);
   const today = startOfDay(now);
 
@@ -73,9 +88,19 @@ export default function CalendarView({ tasks }: { tasks: CalendarTask[] }) {
         map.set(key, list);
       }
     }
+    // Winterising is a water job, so it shares that colour on the grid.
+    for (const m of seasonal) {
+      const date = new Date(m.date);
+      if (!Number.isFinite(date.getTime())) continue;
+      if (date < rangeStart || date > rangeEnd) continue;
+      const key = format(date, "yyyy-MM-dd");
+      const list = map.get(key) ?? [];
+      list.push({ taskKey: m.key, name: m.name, taskType: "water", date });
+      map.set(key, list);
+    }
     return map;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tasks, rangeStart.getTime(), rangeEnd.getTime()]);
+  }, [tasks, seasonal, rangeStart.getTime(), rangeEnd.getTime()]);
 
   const selectedKey = format(selectedDate, "yyyy-MM-dd");
   const selectedOccurrences = byDay.get(selectedKey) ?? [];

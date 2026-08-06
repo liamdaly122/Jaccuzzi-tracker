@@ -66,3 +66,44 @@ describe("buildIcsFeed", () => {
     expect(ics).toContain("DTSTART;VALUE=DATE:");
   });
 });
+
+describe("seasonal events", () => {
+  const seasonal = [
+    {
+      key: "winter-shutdown",
+      name: "Winterise the hot tub",
+      date: new Date("2026-11-02T00:00:00.000Z"),
+      description: "Drain, dry and pack away before frost.",
+    },
+  ];
+
+  it("repeats yearly rather than every 365 days", () => {
+    const feed = buildIcsFeed([], new Date("2026-08-06T09:00:00Z"), seasonal);
+    // INTERVAL=365 would slip a day every leap year.
+    expect(feed).toContain("RRULE:FREQ=YEARLY");
+    expect(feed).not.toContain("INTERVAL=365");
+    expect(feed).toContain("DTSTART;VALUE=DATE:20261102");
+    expect(feed).toContain("UID:winter-shutdown@hot-tub-tracker");
+  });
+
+  it("sits alongside the task events without disturbing them", () => {
+    const tasks = [
+      {
+        taskKey: "test_water",
+        name: "Test the water",
+        taskType: "testing" as const,
+        frequencyDays: 3,
+        lastCompletedAt: null,
+      },
+    ];
+    const feed = buildIcsFeed(tasks, new Date("2026-08-06T09:00:00Z"), seasonal);
+    expect(feed.match(/BEGIN:VEVENT/g)).toHaveLength(2);
+    expect(feed).toContain("RRULE:FREQ=DAILY;INTERVAL=3");
+    expect(feed.trimEnd().endsWith("END:VCALENDAR")).toBe(true);
+  });
+
+  it("omits them entirely when there's no location to work from", () => {
+    const feed = buildIcsFeed([], new Date("2026-08-06T09:00:00Z"));
+    expect(feed).not.toContain("FREQ=YEARLY");
+  });
+});
