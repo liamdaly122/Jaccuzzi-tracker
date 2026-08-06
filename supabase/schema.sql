@@ -81,6 +81,13 @@ alter table test_readings add column if not exists orp_mv numeric(6, 1);
 -- different thing from a measured zero.
 alter table test_readings add column if not exists cyanuric_acid_ppm numeric(6, 1);
 
+-- Winter hibernation. winterised_at is null while the tub is in use and set to
+-- the moment it was shut down for the season; winter_strategy records which of
+-- the three routes was taken ('pack_down', 'freeze_shield', 'drained_in_place')
+-- so the app knows whether the tub is still outdoors and at risk of frost.
+alter table spa_settings add column if not exists winterised_at timestamptz;
+alter table spa_settings add column if not exists winter_strategy text;
+
 -- -----------------------------------------------------------------------------
 -- probe_readings: automatic history from an iopool probe (pH / ORP / temp).
 --

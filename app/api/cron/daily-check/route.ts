@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getSupabase } from "@/lib/supabase";
+import { hibernationState, winterWindow } from "@/lib/winter";
 import {
   getSettings,
   toSpaConfig,
@@ -46,10 +47,24 @@ async function handle(request: NextRequest) {
   let probeCaptured = false;
   let prunedRows = 0;
   let hasDanger = false;
+  let hibernating = false;
+  let stillOutdoors = false;
 
   try {
     const settings = await getSettings();
     const config = toSpaConfig(settings);
+
+    // Packed away for the winter? Routine nagging is noise, and noise is how an
+    // app gets muted. Frost warnings survive, though — a tub that's still in the
+    // garden is still at risk, and that's exactly when a warning earns its keep.
+    const hibernation = hibernationState(
+      settings.winterised_at ?? null,
+      settings.winter_strategy ?? null,
+      winterWindow(settings.latitude === null ? null : Number(settings.latitude), now),
+    );
+    hibernating = hibernation.hibernating;
+    stillOutdoors = hibernation.stillOutdoors;
+
     const tasks = await getTasks();
     dueTasks = tasks
       .map((t) => ({ name: t.name, info: computeNextDue(toTaskLike(t), now) }))
@@ -177,12 +192,20 @@ async function handle(request: NextRequest) {
   }
 
   const parts: string[] = [];
-  if (dueTasks.length) parts.push(`Due: ${dueTasks.join(", ")}`);
-  if (chemAlerts.length) parts.push(`Water: ${chemAlerts.join(" ")}`);
-  if (forecastAlerts.length) parts.push(`Forecast: ${forecastAlerts.join(", ")}`);
-  if (usageAlert) parts.push(usageAlert);
-  if (probeAlerts.length) parts.push(`Probe: ${probeAlerts.join(" · ")}`);
-  if (weatherAlerts.length) parts.push(`Weather: ${weatherAlerts.join(" ")}`);
+  if (hibernating) {
+    // Hibernating: everything routine is about water that isn't there. The one
+    // thing still worth saying is that it's about to freeze outside.
+    if (stillOutdoors && weatherAlerts.length) {
+      parts.push(`Weather: ${weatherAlerts.join(" ")}`);
+    }
+  } else {
+    if (dueTasks.length) parts.push(`Due: ${dueTasks.join(", ")}`);
+    if (chemAlerts.length) parts.push(`Water: ${chemAlerts.join(" ")}`);
+    if (forecastAlerts.length) parts.push(`Forecast: ${forecastAlerts.join(", ")}`);
+    if (usageAlert) parts.push(usageAlert);
+    if (probeAlerts.length) parts.push(`Probe: ${probeAlerts.join(" · ")}`);
+    if (weatherAlerts.length) parts.push(`Weather: ${weatherAlerts.join(" ")}`);
+  }
   const summary = parts.join(" · ");
 
   // Idempotent per-day guard + the daily DB write that prevents auto-pause.

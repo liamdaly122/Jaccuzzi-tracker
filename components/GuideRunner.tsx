@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { Guide } from "@/lib/guides";
@@ -17,9 +17,49 @@ export default function GuideRunner({
   completesTaskId: number | null;
 }) {
   const router = useRouter();
+  // Progress is kept in the browser, not the database: some of these jobs run
+  // over a weekend (winterising alone needs a day or two just for drying), and
+  // losing your ticks because you closed the app makes the checklist useless.
+  const storageKey = `guide-progress:${guide.key}`;
   const [checked, setChecked] = useState<boolean[]>(
     () => guide.steps.map(() => false),
   );
+  const [restored, setRestored] = useState(false);
+
+  // Read on mount rather than in the initialiser, so the server and the first
+  // client render agree and React doesn't complain about a hydration mismatch.
+  useEffect(() => {
+    try {
+      const saved = window.localStorage.getItem(storageKey);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length === guide.steps.length) {
+          setChecked(parsed.map(Boolean));
+        }
+      }
+    } catch {
+      // A blocked or corrupt localStorage just means starting fresh.
+    }
+    setRestored(true);
+  }, [storageKey, guide.steps.length]);
+
+  useEffect(() => {
+    if (!restored) return; // don't overwrite saved progress with the blank slate
+    try {
+      window.localStorage.setItem(storageKey, JSON.stringify(checked));
+    } catch {
+      // Nothing to do — the checklist still works for this session.
+    }
+  }, [checked, restored, storageKey]);
+
+  function clearProgress() {
+    setChecked(guide.steps.map(() => false));
+    try {
+      window.localStorage.removeItem(storageKey);
+    } catch {
+      // Ignore.
+    }
+  }
   const [finishing, setFinishing] = useState(false);
   const [finished, setFinished] = useState(false);
 
@@ -60,7 +100,18 @@ export default function GuideRunner({
             <span>
               {doneCount} of {guide.steps.length} done
             </span>
-            <span>{pct}%</span>
+            <span className="flex items-center gap-2">
+              {doneCount > 0 ? (
+                <button
+                  type="button"
+                  onClick={clearProgress}
+                  className="font-medium text-slate-400 underline underline-offset-2 hover:text-slate-600"
+                >
+                  Start again
+                </button>
+              ) : null}
+              <span>{pct}%</span>
+            </span>
           </div>
           <div className="h-2 overflow-hidden rounded-full bg-slate-100">
             <div
@@ -68,6 +119,12 @@ export default function GuideRunner({
               style={{ width: `${pct}%` }}
             />
           </div>
+          {doneCount > 0 && doneCount < guide.steps.length ? (
+            <p className="mt-1.5 text-xs text-slate-400">
+              Your progress is saved on this device — close the app and pick up
+              where you left off.
+            </p>
+          ) : null}
         </div>
       </Card>
 

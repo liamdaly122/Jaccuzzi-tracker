@@ -105,3 +105,13 @@ export const taskUpdateSchema = z.object({
 export const completeTaskSchema = z.object({
   note: z.string().max(2000).optional().nullable(),
 });
+
+// Starting or ending winter hibernation.
+export const winterSchema = z.object({
+  action: z.enum(["hibernate", "wake"]),
+  strategy: z
+    .enum(["pack_down", "freeze_shield", "drained_in_place"])
+    .optional()
+    .nullable(),
+});
+export type WinterInput = z.infer<typeof winterSchema>;

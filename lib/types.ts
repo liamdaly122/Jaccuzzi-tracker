@@ -22,6 +22,8 @@ export interface SpaSettings {
   target_ranges: TargetRanges;
   dosing_constants: DosingConstants;
   avg_daily_bathers: number;
+  winterised_at: string | null;
+  winter_strategy: string | null;
   latitude: number | null;
   longitude: number | null;
   location_name: string | null;
