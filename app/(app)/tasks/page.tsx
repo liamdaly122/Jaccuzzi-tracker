@@ -84,13 +84,6 @@ export default async function TasksPage() {
         </p>
       </div>
 
-      <WinterCard
-        window={window}
-        countdown={countdown}
-        costs={costs}
-        hibernation={hibernation}
-      />
-
       <div className="space-y-3">
         {withLife.map(({ row, life }) => {
           const pct = Math.round(life.fractionRemaining * 100);
@@ -138,6 +131,15 @@ export default async function TasksPage() {
           );
         })}
       </div>
+
+      {/* Below the tasks: it's a tall card and it's only relevant for a few
+          months a year, whereas the life bars are what this page is opened for. */}
+      <WinterCard
+        window={window}
+        countdown={countdown}
+        costs={costs}
+        hibernation={hibernation}
+      />
     </div>
   );
 }
