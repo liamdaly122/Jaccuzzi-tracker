@@ -122,3 +122,11 @@ export type WinterInput = z.infer<typeof winterSchema>;
 export const soakTargetSchema = z.object({
   tempTarget: z.number().min(20).max(40),
 });
+
+// A saved heating schedule, set from the heating card.
+export const heatingScheduleSchema = z.object({
+  enabled: z.boolean(),
+  weekdays: z.array(z.number().int().min(0).max(6)).max(7),
+  time: z.string().regex(/^([01]?\d|2[0-3]):[0-5]\d$/, "Use a 24-hour time like 13:00"),
+});
+export type HeatingScheduleInput = z.infer<typeof heatingScheduleSchema>;

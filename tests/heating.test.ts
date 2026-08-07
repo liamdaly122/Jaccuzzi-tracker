@@ -7,7 +7,10 @@ import {
   heatingPlan,
   keepWarmVsReheat,
   nextOccurrenceOf,
+  nextScheduledSoak,
   nextSoakTime,
+  parseHeatingSchedule,
+  resolveReadyAt,
   observedHeatingRate,
   reachableByC,
   soakPattern,
@@ -442,5 +445,144 @@ describe("soak temperature", () => {
       volumeLitres: V,
     })!;
     expect(at40.keepWarmWeekly).toBeGreaterThan(at38.keepWarmWeekly);
+  });
+});
+
+// --- A schedule you actually set ------------------------------------------------
+describe("parseHeatingSchedule", () => {
+  it("reads a well-formed schedule out of the settings blob", () => {
+    const s = parseHeatingSchedule({
+      enabled: true,
+      weekdays: [1, 3, 5],
+      time: "13:00",
+    })!;
+    expect(s.weekdays).toEqual([1, 3, 5]);
+    expect(s.time).toBe("13:00");
+    expect(s.enabled).toBe(true);
+  });
+
+  it("pads a sloppy but valid time", () => {
+    expect(parseHeatingSchedule({ weekdays: [2], time: "9:05" })!.time).toBe("09:05");
+  });
+
+  it("treats a missing enabled flag as on", () => {
+    expect(parseHeatingSchedule({ weekdays: [0], time: "10:00" })!.enabled).toBe(true);
+  });
+
+  it("refuses junk rather than firing a reminder at 25 o'clock", () => {
+    for (const bad of [
+      null,
+      "nonsense",
+      {},
+      { weekdays: [1], time: "25:00" },
+      { weekdays: [1], time: "12:70" },
+      { weekdays: [1], time: "" },
+      { weekdays: [9], time: "12:00" }, // no such weekday
+      { weekdays: [1, "tuesday"], time: "12:00" },
+      { weekdays: "everyday", time: "12:00" },
+      { weekdays: [], time: "12:00" }, // would never fire
+    ]) {
+      expect(parseHeatingSchedule(bad)).toBeNull();
+    }
+  });
+
+  it("de-duplicates without silently dropping a real day", () => {
+    // [1,1] is a duplicate, not a typo we should quietly accept.
+    expect(parseHeatingSchedule({ weekdays: [1, 1], time: "12:00" })).toBeNull();
+  });
+});
+
+describe("nextScheduledSoak", () => {
+  const daily = { enabled: true, weekdays: [0, 1, 2, 3, 4, 5, 6], time: "13:00" };
+
+  it("lands on today when the time is still ahead", () => {
+    const at = nextScheduledSoak(daily, new Date("2026-08-12T09:44:00"))!;
+    expect(at.getDate()).toBe(12);
+    expect(at.getHours()).toBe(13);
+    expect(at.getMinutes()).toBe(0);
+  });
+
+  it("rolls to tomorrow once the time has gone", () => {
+    const at = nextScheduledSoak(daily, new Date("2026-08-12T14:00:00"))!;
+    expect(at.getDate()).toBe(13);
+  });
+
+  it("honours minutes, unlike the learned pattern", () => {
+    const at = nextScheduledSoak(
+      { ...daily, time: "19:45" },
+      new Date("2026-08-12T09:00:00"),
+    )!;
+    expect(at.getHours()).toBe(19);
+    expect(at.getMinutes()).toBe(45);
+  });
+
+  it("skips to the next matching weekday", () => {
+    // Fridays only, asked on a Wednesday.
+    const fridays = { enabled: true, weekdays: [5], time: "20:00" };
+    const at = nextScheduledSoak(fridays, new Date("2026-08-12T09:00:00"))!;
+    expect(at.getDay()).toBe(5);
+    expect(at.getDate()).toBe(14);
+  });
+
+  it("jumps a whole week when today is the only day and it's passed", () => {
+    const wednesdays = { enabled: true, weekdays: [3], time: "08:00" };
+    const at = nextScheduledSoak(wednesdays, new Date("2026-08-12T09:00:00"))!;
+    expect(at.getDay()).toBe(3);
+    expect(at.getDate()).toBe(19); // next Wednesday
+  });
+
+  it("has nothing to offer when switched off or empty", () => {
+    const now = new Date("2026-08-12T09:00:00");
+    expect(nextScheduledSoak({ ...daily, enabled: false }, now)).toBeNull();
+    expect(nextScheduledSoak({ ...daily, weekdays: [] }, now)).toBeNull();
+    expect(nextScheduledSoak(null, now)).toBeNull();
+  });
+
+  it("always lands in the future", () => {
+    const now = new Date("2026-08-12T13:00:00");
+    for (const t of ["00:00", "12:59", "13:00", "13:01", "23:59"]) {
+      const at = nextScheduledSoak({ ...daily, time: t }, now)!;
+      expect(at.getTime()).toBeGreaterThan(now.getTime());
+    }
+  });
+});
+
+describe("resolveReadyAt", () => {
+  const now = new Date("2026-08-12T09:00:00");
+  const pattern = { weekdays: [5], hour: 20, soaks: 9, confident: true };
+  const schedule = { enabled: true, weekdays: [0, 1, 2, 3, 4, 5, 6], time: "13:00" };
+
+  it("prefers what you saved over what it guessed", () => {
+    const r = resolveReadyAt({ schedule, pattern, now });
+    expect(r.source).toBe("schedule");
+    expect(r.readyAt.getHours()).toBe(13);
+  });
+
+  it("falls back to the learned pattern with no schedule saved", () => {
+    const r = resolveReadyAt({ schedule: null, pattern, now });
+    expect(r.source).toBe("pattern");
+    expect(r.readyAt.getHours()).toBe(20);
+  });
+
+  it("falls back again when there's nothing to learn from either", () => {
+    const r = resolveReadyAt({ schedule: null, pattern: null, now });
+    expect(r.source).toBe("default");
+    expect(r.readyAt.getTime()).toBeGreaterThan(now.getTime());
+  });
+
+  it("ignores a disabled schedule rather than treating it as saved", () => {
+    const r = resolveReadyAt({
+      schedule: { ...schedule, enabled: false },
+      pattern,
+      now,
+    });
+    expect(r.source).toBe("pattern");
+  });
+
+  it("reproduces the old behaviour exactly when nothing is saved", () => {
+    // Existing users must see no change until they save a schedule.
+    expect(resolveReadyAt({ schedule: null, pattern, now }).readyAt).toEqual(
+      nextSoakTime(pattern, now),
+    );
   });
 });

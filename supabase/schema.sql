@@ -85,6 +85,12 @@ alter table test_readings add column if not exists cyanuric_acid_ppm numeric(6, 
 -- the moment it was shut down for the season; winter_strategy records which of
 -- the three routes was taken ('pack_down', 'freeze_shield', 'drained_in_place')
 -- so the app knows whether the tub is still outdoors and at risk of frost.
+-- A saved heating schedule: which days and what time you want the water ready.
+-- Shape: { "enabled": true, "weekdays": [0,1,2,3,4,5,6], "time": "13:00" }.
+-- The temperature deliberately lives in target_ranges.tempTarget instead — one
+-- copy, so the two can't drift apart.
+alter table spa_settings add column if not exists heating_schedule jsonb;
+
 alter table spa_settings add column if not exists winterised_at timestamptz;
 alter table spa_settings add column if not exists winter_strategy text;
 

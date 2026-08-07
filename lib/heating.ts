@@ -306,6 +306,102 @@ export function nextOccurrenceOf(hhmm: string, now: Date = new Date()): Date | n
   return tomorrow;
 }
 
+// --- A schedule you actually set -----------------------------------------------
+//
+// Everything above LEARNS when you soak from the log. That's fine as a default
+// and useless as a promise: stop tapping "log a soak" and the morning reminder
+// quietly stops with it. A saved schedule is a fact, so it wins over the guess.
+//
+// Temperature isn't stored here — it already lives in targetRanges.tempTarget.
+// Two copies of the same preference is how they end up disagreeing.
+export interface HeatingSchedule {
+  enabled: boolean;
+  /** 0 = Sunday, matching Date.getDay(). */
+  weekdays: number[];
+  /** "HH:MM" in the user's own timezone. */
+  time: string;
+}
+
+/**
+ * Read a schedule out of the settings jsonb. Deliberately suspicious of what it
+ * finds: a hand-edited or half-written blob should mean "no schedule", not a
+ * reminder firing at 25 o'clock.
+ */
+export function parseHeatingSchedule(raw: unknown): HeatingSchedule | null {
+  if (!raw || typeof raw !== "object") return null;
+  const o = raw as Record<string, unknown>;
+
+  if (typeof o.time !== "string" || !/^(\d{1,2}):(\d{2})$/.test(o.time.trim())) {
+    return null;
+  }
+  const [h, m] = o.time.trim().split(":").map(Number);
+  if (h < 0 || h > 23 || m < 0 || m > 59) return null;
+
+  if (!Array.isArray(o.weekdays)) return null;
+  const weekdays = Array.from(
+    new Set(
+      o.weekdays.filter(
+        (d): d is number => typeof d === "number" && Number.isInteger(d) && d >= 0 && d <= 6,
+      ),
+    ),
+  ).sort((a, b) => a - b);
+  if (weekdays.length !== o.weekdays.length) return null;
+  if (weekdays.length === 0) return null;
+
+  return {
+    enabled: o.enabled !== false, // absent means on
+    weekdays,
+    time: `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`,
+  };
+}
+
+/**
+ * The next moment matching a saved schedule. Minute-precise, unlike
+ * nextSoakTime — a learned pattern only knows the hour, but a time you typed in
+ * deserves to be honoured exactly.
+ */
+export function nextScheduledSoak(
+  schedule: HeatingSchedule | null,
+  now: Date = new Date(),
+): Date | null {
+  if (!schedule || !schedule.enabled || schedule.weekdays.length === 0) return null;
+  const [hour, minute] = schedule.time.split(":").map(Number);
+
+  // Eight days rather than seven, so a schedule with a single weekday still
+  // resolves when today IS that day but the time has already gone.
+  for (let i = 0; i < 8; i += 1) {
+    const d = new Date(now);
+    d.setDate(d.getDate() + i);
+    d.setHours(hour, minute, 0, 0);
+    if (d.getTime() <= now.getTime()) continue;
+    if (schedule.weekdays.includes(d.getDay())) return d;
+  }
+  return null;
+}
+
+export type ReadyAtSource = "schedule" | "pattern" | "default";
+
+/**
+ * One resolver for both the card and the morning push, so the two can never
+ * disagree about when you want to get in. Saved schedule beats learned pattern
+ * beats a sensible evening.
+ */
+export function resolveReadyAt(opts: {
+  schedule: HeatingSchedule | null;
+  pattern: SoakPattern | null;
+  now?: Date;
+}): { readyAt: Date; source: ReadyAtSource } {
+  const now = opts.now ?? new Date();
+
+  const scheduled = nextScheduledSoak(opts.schedule, now);
+  if (scheduled) return { readyAt: scheduled, source: "schedule" };
+
+  return {
+    readyAt: nextSoakTime(opts.pattern, now),
+    source: opts.pattern ? "pattern" : "default",
+  };
+}
+
 /** The next time matching the learned pattern, for pre-filling the picker. */
 export function nextSoakTime(
   pattern: SoakPattern | null,
