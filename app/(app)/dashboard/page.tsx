@@ -8,6 +8,7 @@ import Icon from "@/components/Icon";
 import ProbeCard from "@/components/ProbeCard";
 import QuickLinks from "@/components/QuickLinks";
 import HeaterProtectionCard from "@/components/HeaterProtectionCard";
+import HeatingPlanCard from "@/components/HeatingPlanCard";
 import {
   getSettings,
   toSpaConfig,
@@ -17,6 +18,7 @@ import {
   getLastNotification,
   getBathersSince,
   getRecentDosing,
+  getRecentUsage,
   captureProbeReading,
   getProbeReadingsSince,
   toTaskLike,
@@ -34,6 +36,14 @@ import {
 import { buildForecasts } from "@/lib/predict";
 import { lsiSnapshot } from "@/lib/balance";
 import { hibernationState, winterWindow } from "@/lib/winter";
+import {
+  effectiveHeaterWatts,
+  keepWarmVsReheat,
+  nextSoakTime,
+  observedHeatingRate,
+  soakPattern,
+  soaksPerWeek,
+} from "@/lib/heating";
 import { getForecast, weatherAdvice, type WeatherForecast } from "@/lib/weather";
 import { getIopoolReading, isIopoolConfigured } from "@/lib/iopool";
 import { orpDrift } from "@/lib/probe";
@@ -46,6 +56,9 @@ import {
 } from "@/lib/display";
 
 export const dynamic = "force-dynamic";
+
+// What people actually soak at. Above 40 C is unsafe for most adults.
+const TARGET_WATER_C = 38;
 
 export default async function DashboardPage() {
   let settings, tasks, latest, recentReadings, lastNotification;
@@ -206,6 +219,21 @@ export default async function DashboardPage() {
     cyaDrainAbove: config.targetRanges.cyaDrainAbove,
   });
 
+  // --- Heating plan ----------------------------------------------------------
+  // The live probe reading is the freshest water temperature we have; probe
+  // history is what tells us how fast this tub actually climbs.
+  const waterC = probe?.measure.temperatureC ?? null;
+  const rate = observedHeatingRate(probeRows);
+
+  let usageRows: Awaited<ReturnType<typeof getRecentUsage>> = [];
+  try {
+    usageRows = await getRecentUsage(60);
+  } catch {
+    usageRows = [];
+  }
+  const pattern = soakPattern(usageRows);
+  const readyAt = nextSoakTime(pattern, now);
+
   // Weather (only when a location is set; fetch failures just hide the card).
   let weather: WeatherForecast | null = null;
   if (settings.latitude != null && settings.longitude != null) {
@@ -218,6 +246,30 @@ export default async function DashboardPage() {
   const advisories = weather
     ? weatherAdvice(weather, config.sanitizerType)
     : [];
+
+  // Mean of the day's high and low: a heat-up spans day and night, so neither
+  // end on its own is representative. The plan's buffer covers the difference.
+  const today = weather?.days[0];
+  const ambientC =
+    today && Number.isFinite(today.tempMax) && Number.isFinite(today.tempMin)
+      ? (today.tempMax + today.tempMin) / 2
+      : 12;
+  const heater = effectiveHeaterWatts(rate, ambientC, config.volumeLitres);
+  const perWeek = soaksPerWeek(usageRows, now);
+  const keepWarm =
+    perWeek > 0
+      ? keepWarmVsReheat({
+          soaksPerWeek: perWeek,
+          targetC: TARGET_WATER_C,
+          ambientC,
+          coolsToC: Math.max(ambientC + 2, 15),
+          watts: heater.watts,
+          volumeLitres: config.volumeLitres,
+        })
+      : null;
+  const patternNote = pattern
+    ? `Pre-filled from the ${pattern.soaks} soaks you've logged — change it if tonight's different.`
+    : "Log a few soaks and I'll learn when you usually get in.";
 
   return (
     <div className="space-y-4">
@@ -262,6 +314,21 @@ export default async function DashboardPage() {
       ) : null}
 
       {probe ? <ProbeCard pool={probe} ranges={config.targetRanges} /> : null}
+
+      <HeatingPlanCard
+        currentC={waterC}
+        targetC={TARGET_WATER_C}
+        ambientC={ambientC}
+        watts={heater.watts}
+        measured={heater.measured}
+        samples={heater.samples}
+        volumeLitres={config.volumeLitres}
+        pricePerKwh={0.27}
+        defaultReadyAtIso={readyAt.toISOString()}
+        nowIso={now.toISOString()}
+        keepWarm={keepWarm}
+        patternNote={patternNote}
+      />
 
       {/* Sanitiser drift, explained in plain terms */}
       {drift?.message ? (

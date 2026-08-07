@@ -279,6 +279,17 @@ This uses a free service with no key needed.
   were a fortnight ago** — that last one is the water telling you it's tiring,
   usually before the calendar does. It also shows what a refill costs to heat,
   so you change it on the numbers rather than out of habit.
+- **Heating plan (Today screen):** tells you what time to switch the heater on so
+  the water is at temperature when you actually want to get in. This is less
+  obvious than it sounds — from 20 °C your tub takes about **14 hours**, and from
+  cold in winter closer to **25**, so "I'll put it on when I get home" doesn't
+  work. Set when you want it ready (it pre-fills from when you usually soak) and
+  it works backwards, allowing for how cold it is outside. At first it estimates
+  from your tub size; once the probe has recorded a few real heat-ups it uses
+  what *your* tub actually manages. It also tells you whether it's cheaper to
+  leave it hot or let it cool between soaks — that flips somewhere around three
+  soaks a week, so it's genuinely worth checking. On days you'd normally soak,
+  the morning push says when to flick the switch.
 - **Heater protection (Today screen):** every other check looks at one number on
   its own. This one looks at pH, alkalinity, calcium **and water temperature
   together** — because they can each read "in range" while the combination

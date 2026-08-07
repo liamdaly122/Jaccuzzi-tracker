@@ -2,6 +2,13 @@ import { NextResponse, type NextRequest } from "next/server";
 import { getSupabase } from "@/lib/supabase";
 import { hibernationState, winterWindow } from "@/lib/winter";
 import {
+  effectiveHeaterWatts,
+  heatingPlan,
+  nextSoakTime,
+  observedHeatingRate,
+  soakPattern,
+} from "@/lib/heating";
+import {
   getSettings,
   toSpaConfig,
   getTasks,
@@ -17,10 +24,18 @@ import { buildForecasts } from "@/lib/predict";
 import { usageWaterStatus, sanitiserDemandTrend } from "@/lib/water";
 import { getForecast, weatherAdvice } from "@/lib/weather";
 import { getIopoolReading, isIopoolConfigured } from "@/lib/iopool";
-import { captureProbeReading, pruneProbeReadings } from "@/lib/data";
+import {
+  captureProbeReading,
+  pruneProbeReadings,
+  getRecentUsage,
+  getRecentProbeReadings,
+} from "@/lib/data";
 import { sendNtfy } from "@/lib/ntfy";
 
 export const runtime = "nodejs";
+
+// The temperature people actually soak at.
+const SOAK_TARGET_C = 38;
 export const dynamic = "force-dynamic";
 
 // The daily scheduler. Vercel Cron calls this once a day and automatically
@@ -47,6 +62,11 @@ async function handle(request: NextRequest) {
   let probeCaptured = false;
   let prunedRows = 0;
   let hasDanger = false;
+  let heatingAlert: string | null = null;
+  // Hoisted out of the probe and weather blocks below so the heating heads-up
+  // can use both. 12 C is a mild-UK-day stand-in when no location is set.
+  let probeWaterC: number | null = null;
+  let ambientForHeating = 12;
   let hibernating = false;
   let stillOutdoors = false;
 
@@ -144,6 +164,7 @@ async function handle(request: NextRequest) {
       if (probe.ok) {
         const m = probe.pool.measure;
         probeCaptured = await captureProbeReading(m);
+        probeWaterC = m.temperatureC;
 
         const r = config.targetRanges;
         const orpMin = r.orpMin ?? 650;
@@ -182,8 +203,50 @@ async function handle(request: NextRequest) {
         );
         weatherAlerts = advisories.map((a) => a.message);
         if (advisories.some((a) => a.code === "frost")) hasDanger = true;
+
+        // Mean of the day's high and low: a heat-up spans day and night.
+        const d = forecast.days[0];
+        if (d && Number.isFinite(d.tempMax) && Number.isFinite(d.tempMin)) {
+          ambientForHeating = (d.tempMax + d.tempMin) / 2;
+        }
       }
     }
+
+    // Heating heads-up: on days they'd usually soak, say when to flick the
+    // switch. This is the whole reason the daily push exists — a 14-hour
+    // heat-up is useless information at 7pm.
+    try {
+      const usageRows = await getRecentUsage(60);
+      const pattern = soakPattern(usageRows);
+      const readyAt = nextSoakTime(pattern, now);
+      const isToday = readyAt.toDateString() === now.toDateString();
+      const waterC = probeWaterC;
+
+      if (isToday && waterC !== null) {
+        const rate = observedHeatingRate(await getRecentProbeReadings(400));
+        const heater = effectiveHeaterWatts(rate, ambientForHeating, config.volumeLitres);
+        const plan = heatingPlan({
+          currentC: waterC,
+          targetC: SOAK_TARGET_C,
+          readyAt,
+          ambientC: ambientForHeating,
+          watts: heater.watts,
+          volumeLitres: config.volumeLitres,
+          now,
+        });
+        if (plan && !plan.alreadyWarmEnough && !plan.unreachable) {
+          const hhmm = (d: Date) =>
+            d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+          heatingAlert = plan.tooLate
+            ? `Water is ${waterC}°C — too late to reach ${SOAK_TARGET_C}°C by ${hhmm(readyAt)}, switch on now to get part-way`
+            : `Switch the heater on by ${hhmm(plan.switchOnAt!)} to be ready for ${hhmm(readyAt)} (£${plan.cost.toFixed(2)})`;
+        }
+      }
+    } catch {
+      // Never let the heads-up break the daily check.
+    }
+
+
   } catch (err) {
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Cron failed" },
@@ -202,6 +265,7 @@ async function handle(request: NextRequest) {
     if (dueTasks.length) parts.push(`Due: ${dueTasks.join(", ")}`);
     if (chemAlerts.length) parts.push(`Water: ${chemAlerts.join(" ")}`);
     if (forecastAlerts.length) parts.push(`Forecast: ${forecastAlerts.join(", ")}`);
+    if (heatingAlert) parts.push(`Heating: ${heatingAlert}`);
     if (usageAlert) parts.push(usageAlert);
     if (probeAlerts.length) parts.push(`Probe: ${probeAlerts.join(" · ")}`);
     if (weatherAlerts.length) parts.push(`Weather: ${weatherAlerts.join(" ")}`);
