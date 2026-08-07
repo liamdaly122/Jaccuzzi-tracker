@@ -28,6 +28,11 @@
 //  Sources: Lay-Z-Spa UK's winter care and pack-away guidance.
 // =============================================================================
 
+import { heatLossAreaM2, U_VALUE_W_PER_M2K } from "./thermal";
+
+// Re-exported so existing callers and tests keep their import path.
+export { heatLossAreaM2 };
+
 // Freeze Shield's published behaviour: on below 6 C ambient, heats to 10 C.
 export const FREEZE_SHIELD_ON_C = 6;
 export const FREEZE_SHIELD_TARGET_C = 10;
@@ -219,19 +224,9 @@ export function winterCountdown(
 //
 // Packing down costs nothing all winter; its only cost is refilling in spring,
 // which lib/water.ts already knows how to price.
-const TYPICAL_FILL_DEPTH_M = 0.55;
-const U_VALUE_W_PER_M2K = 3;
 // Ambient on a mild winter day vs during a cold snap.
 const MILD_WINTER_AMBIENT_C = 5;
 const COLD_SNAP_AMBIENT_C = -2;
-
-/** Heat-loss surface area (top, walls, base) implied by a tub's water volume. */
-export function heatLossAreaM2(volumeLitres: number): number {
-  const volumeM3 = volumeLitres / 1000;
-  const footprint = volumeM3 / TYPICAL_FILL_DEPTH_M;
-  const side = Math.sqrt(footprint);
-  return footprint * 2 + 4 * side * TYPICAL_FILL_DEPTH_M;
-}
 
 export interface CostRange {
   low: number;
