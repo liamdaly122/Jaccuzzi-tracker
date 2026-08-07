@@ -25,10 +25,12 @@
 
 import { SPECIFIC_HEAT_KJ_PER_KG_K } from "./water";
 
-// An air-filled vinyl wall with the cover on. This is the weak assumption in
-// the whole model, which is why anything built on it reports a range or carries
-// a buffer rather than pretending to be precise.
-export const U_VALUE_W_PER_M2K = 3;
+// A bare air-filled vinyl wall with the standard cover on — the last-resort
+// fallback for a tub we know nothing about. It is a poor description of an
+// insulated one: a full cover package measures nearer 0.5 W/m2K, which is a
+// FIVE-fold difference in every heat-loss figure the app prints. Prefer a
+// measured UA whenever there is one (see heatLossFromStandingLoss).
+export const DEFAULT_U_VALUE_W_PER_M2K = 3;
 
 // Water depth at a typical fill, used to infer the tub's shape from its volume.
 const TYPICAL_FILL_DEPTH_M = 0.55;
@@ -49,9 +51,38 @@ export function heatLossAreaM2(volumeLitres: number): number {
   return footprint * 2 + 4 * side * TYPICAL_FILL_DEPTH_M;
 }
 
-/** Watts lost per degree the water sits above its surroundings. */
-export function heatLossPerKelvin(volumeLitres: number): number {
-  return U_VALUE_W_PER_M2K * heatLossAreaM2(volumeLitres);
+/**
+ * Watts lost per degree the water sits above its surroundings — "UA".
+ *
+ * UA is the primitive the physics actually needs, and the one to store. A
+ * U-value alone is ambiguous because it is coupled to whichever surface area
+ * was assumed; UA is measurable straight off a cooling curve with no area
+ * estimate at all.
+ */
+export function defaultHeatLossPerKelvin(volumeLitres: number): number {
+  return DEFAULT_U_VALUE_W_PER_M2K * heatLossAreaM2(volumeLitres);
+}
+
+/**
+ * Turn a measured standing loss into UA: "the water drops X °C an hour with the
+ * lid on, when it's Y degrees warmer than the air".
+ *
+ * This is how a real insulation figure gets into the model — from a measurement
+ * of the tub, rather than a manufacturer's claim about a cover.
+ */
+export function heatLossFromStandingLoss(
+  ratePerHourC: number,
+  deltaTK: number,
+  volumeLitres: number,
+): number | null {
+  if (!(ratePerHourC > 0) || !(deltaTK > 0) || !(volumeLitres > 0)) return null;
+  const watts = ratePerHourC * thermalMassKwhPerK(volumeLitres) * 1000;
+  return watts / deltaTK;
+}
+
+/** The U-value a given UA implies, for display only — never for calculation. */
+export function impliedUValue(uaWPerK: number, volumeLitres: number): number {
+  return uaWPerK / heatLossAreaM2(volumeLitres);
 }
 
 /** Energy needed to lift the whole tub by one degree, in kWh. */
@@ -67,9 +98,9 @@ export function thermalMassKwhPerK(volumeLitres: number): number {
 export function equilibriumTempC(
   ambientC: number,
   watts: number,
-  volumeLitres: number,
+  uaWPerK: number,
 ): number {
-  return ambientC + watts / heatLossPerKelvin(volumeLitres);
+  return ambientC + watts / uaWPerK;
 }
 
 /** Instantaneous climb rate in °C per hour at a given water temperature. */
@@ -78,8 +109,9 @@ export function heatingRateCPerHour(
   ambientC: number,
   watts: number,
   volumeLitres: number,
+  uaWPerK: number = defaultHeatLossPerKelvin(volumeLitres),
 ): number {
-  const netWatts = watts - heatLossPerKelvin(volumeLitres) * (waterC - ambientC);
+  const netWatts = watts - uaWPerK * (waterC - ambientC);
   return netWatts / 1000 / thermalMassKwhPerK(volumeLitres);
 }
 
@@ -97,16 +129,17 @@ export function heatUpHours(
   ambientC: number,
   watts: number,
   volumeLitres: number,
+  uaWPerK: number = defaultHeatLossPerKelvin(volumeLitres),
 ): number | null {
   if (!Number.isFinite(fromC) || !Number.isFinite(toC)) return null;
   if (toC <= fromC) return 0;
-  if (watts <= 0 || volumeLitres <= 0) return null;
+  if (watts <= 0 || volumeLitres <= 0 || uaWPerK <= 0) return null;
 
-  const equilibrium = equilibriumTempC(ambientC, watts, volumeLitres);
+  const equilibrium = equilibriumTempC(ambientC, watts, uaWPerK);
   // A hair below the ceiling takes infinitely long, so treat it as unreachable.
   if (toC >= equilibrium) return null;
 
-  const uaKw = heatLossPerKelvin(volumeLitres) / 1000;
+  const uaKw = uaWPerK / 1000;
   const hours =
     (thermalMassKwhPerK(volumeLitres) / uaKw) *
     Math.log((equilibrium - fromC) / (equilibrium - toC));
@@ -127,7 +160,8 @@ export function standbyKwhPerDay(
   holdAtC: number,
   ambientC: number,
   volumeLitres: number,
+  uaWPerK: number = defaultHeatLossPerKelvin(volumeLitres),
 ): number {
-  const watts = Math.max(0, heatLossPerKelvin(volumeLitres) * (holdAtC - ambientC));
+  const watts = Math.max(0, uaWPerK * (holdAtC - ambientC));
   return (watts * 24) / 1000;
 }

@@ -11,7 +11,9 @@ import {
   nextSoakTime,
   parseHeatingSchedule,
   resolveReadyAt,
+  observedCoolingRate,
   observedHeatingRate,
+  resolveHeatLoss,
   reachableByC,
   soakPattern,
   soaksPerWeek,
@@ -19,6 +21,7 @@ import {
 } from "../lib/heating";
 import {
   NAMEPLATE_HEATER_WATTS,
+  defaultHeatLossPerKelvin,
   equilibriumTempC,
   heatUpHours,
   heatingRateCPerHour,
@@ -28,6 +31,7 @@ import {
 const V = 1180; // the user's tub
 const P = NAMEPLATE_HEATER_WATTS;
 const HOUR = 60 * 60 * 1000;
+const UA = defaultHeatLossPerKelvin(V); // the generic uninsulated assumption
 
 describe("thermal model — checked against the manufacturer's figure", () => {
   // Lay-Z-Spa publish "1 °C to 1.5 °C per hour" for this model. If the physics
@@ -69,9 +73,9 @@ describe("thermal model — checked against the manufacturer's figure", () => {
   });
 
   it("knows the temperature it would eventually settle at", () => {
-    const e = equilibriumTempC(10, P, V);
+    const e = equilibriumTempC(10, P, UA);
     expect(e).toBeGreaterThan(40); // comfortably above any target in practice
-    expect(equilibriumTempC(2, P, V)).toBeLessThan(e);
+    expect(equilibriumTempC(2, P, UA)).toBeLessThan(e);
   });
 });
 
@@ -251,7 +255,7 @@ describe("reachableByC", () => {
   });
 
   it("approaches equilibrium but never passes it", () => {
-    const e = equilibriumTempC(15, P, V);
+    const e = equilibriumTempC(15, P, UA);
     expect(reachableByC(20, 500, 15, P, V)).toBeLessThanOrEqual(e + 0.1);
   });
 });
@@ -584,5 +588,108 @@ describe("resolveReadyAt", () => {
     expect(resolveReadyAt({ schedule: null, pattern, now }).readyAt).toEqual(
       nextSoakTime(pattern, now),
     );
+  });
+});
+
+// --- Learning the tub's insulation ---------------------------------------------
+describe("observedCoolingRate", () => {
+  // A well-covered tub drifting down at 0.1 °C/h, sampled hourly.
+  const standing = Array.from({ length: 8 }, (_, i) => row(i, 40 - i * 0.1));
+
+  it("picks up the standing loss from probe history", () => {
+    const c = observedCoolingRate(standing);
+    expect(c.ratePerHour).toBeCloseTo(0.1, 2);
+    expect(c.samples).toBeGreaterThanOrEqual(5);
+  });
+
+  it("ignores a lid-off soak, which is a different regime entirely", () => {
+    // 1.25 °C/h is someone sitting in it, not the covers leaking.
+    const soak = Array.from({ length: 8 }, (_, i) => row(i, 40 - i * 1.25));
+    expect(observedCoolingRate(soak).ratePerHour).toBeNull();
+  });
+
+  it("keeps the standing loss when a soak is mixed in with it", () => {
+    const mixed = [
+      ...standing,
+      row(9, 38), // an hour with the lid off
+      row(10, 36.8),
+    ];
+    // The soak intervals are filtered out rather than dragging the figure up.
+    expect(observedCoolingRate(mixed).ratePerHour).toBeCloseTo(0.1, 1);
+  });
+
+  it("ignores heating, and won't guess from a couple of points", () => {
+    expect(observedCoolingRate([row(0, 20), row(1, 21.2)]).ratePerHour).toBeNull();
+    expect(observedCoolingRate([row(0, 40), row(1, 39.9)]).ratePerHour).toBeNull();
+  });
+});
+
+describe("resolveHeatLoss", () => {
+  const standing = Array.from({ length: 8 }, (_, i) => row(i, 40 - i * 0.1));
+
+  it("prefers what the probe measured over anything assumed", () => {
+    const r = resolveHeatLoss({
+      cooling: observedCoolingRate(standing),
+      ambientC: 7,
+      savedWPerK: 99,
+      volumeLitres: V,
+    });
+    expect(r.basis).toBe("measured");
+    // ~0.1 °C/h across a 32 K gap is roughly 4 W/K, not the generic 22.5.
+    expect(r.uaWPerK).toBeLessThan(6);
+  });
+
+  it("falls back to a saved figure, then to the generic one", () => {
+    const saved = resolveHeatLoss({
+      cooling: null,
+      ambientC: 7,
+      savedWPerK: 4.2,
+      volumeLitres: V,
+    });
+    expect(saved.basis).toBe("setting");
+    expect(saved.uaWPerK).toBe(4.2);
+
+    const generic = resolveHeatLoss({ cooling: null, ambientC: 7, volumeLitres: V });
+    expect(generic.basis).toBe("estimated");
+    expect(generic.uaWPerK).toBeCloseTo(defaultHeatLossPerKelvin(V), 5);
+  });
+
+  it("ignores a nonsense saved figure rather than trusting it", () => {
+    const r = resolveHeatLoss({
+      cooling: null,
+      ambientC: 7,
+      savedWPerK: -5,
+      volumeLitres: V,
+    });
+    expect(r.basis).toBe("estimated");
+  });
+});
+
+describe("heat loss changes the answers the app gives", () => {
+  const insulated = 4.2;
+
+  it("heats up meaningfully faster with real covers on", () => {
+    const generic = heatUpHours(37.5, 40, 14, P, V)!;
+    const real = heatUpHours(37.5, 40, 14, P, V, insulated)!;
+    expect(real).toBeLessThan(generic);
+    // ~106 minutes rather than ~138 — the half-hour the app was getting wrong.
+    expect(real * 60).toBeCloseTo(106, -1);
+  });
+
+  it("makes the weather almost irrelevant to heat-up time", () => {
+    // Well insulated, heater power sets the pace, not the air temperature.
+    const mild = heatingRateCPerHour(40, 14, P, V, insulated);
+    const freezing = heatingRateCPerHour(40, 0, P, V, insulated);
+    expect(Math.abs(mild - freezing) / mild).toBeLessThan(0.05);
+
+    // Uninsulated, the same swing matters a great deal more.
+    const genericMild = heatingRateCPerHour(40, 14, P, V);
+    const genericFreezing = heatingRateCPerHour(40, 0, P, V);
+    expect(Math.abs(genericMild - genericFreezing) / genericMild).toBeGreaterThan(0.2);
+  });
+
+  it("still reproduces the old numbers when nothing is known", () => {
+    // Existing users without an insulation figure must see no change.
+    expect(heatUpHours(20, 38, 15, P, V)).toBeCloseTo(14.3, 0);
   });
 });

@@ -28,7 +28,7 @@
 //  Sources: Lay-Z-Spa UK's winter care and pack-away guidance.
 // =============================================================================
 
-import { heatLossAreaM2, U_VALUE_W_PER_M2K } from "./thermal";
+import { defaultHeatLossPerKelvin, heatLossAreaM2 } from "./thermal";
 
 // Re-exported so existing callers and tests keep their import path.
 export { heatLossAreaM2 };
@@ -247,14 +247,14 @@ export interface WinterCostComparison {
 export function compareWinterCosts(
   volumeLitres: number,
   days: number,
-  opts: { pricePerKwh?: number; refillCost?: number } = {},
+  opts: { pricePerKwh?: number; refillCost?: number; uaWPerK?: number } = {},
 ): WinterCostComparison {
   const pricePerKwh = opts.pricePerKwh ?? 0.27;
-  const area = heatLossAreaM2(volumeLitres);
+  const ua = opts.uaWPerK ?? defaultHeatLossPerKelvin(volumeLitres);
 
   const dailyKwh = (ambientC: number): number => {
     const deltaT = Math.max(0, FREEZE_SHIELD_MEAN_WATER_C - ambientC);
-    const watts = U_VALUE_W_PER_M2K * area * deltaT;
+    const watts = ua * deltaT;
     return (watts * 24) / 1000;
   };
 

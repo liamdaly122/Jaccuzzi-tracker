@@ -21,8 +21,9 @@
 
 import {
   NAMEPLATE_HEATER_WATTS,
+  defaultHeatLossPerKelvin,
   equilibriumTempC,
-  heatLossPerKelvin,
+  heatLossFromStandingLoss,
   heatUpHours,
   heatUpKwh,
   standbyKwhPerDay,
@@ -117,6 +118,7 @@ export function effectiveHeaterWatts(
   rate: HeatingRate,
   ambientC: number,
   volumeLitres: number,
+  uaWPerK: number = defaultHeatLossPerKelvin(volumeLitres),
 ): { watts: number; measured: boolean; samples: number } {
   if (rate.ratePerHour === null || rate.meanWaterC === null) {
     return { watts: NAMEPLATE_HEATER_WATTS, measured: false, samples: rate.samples };
@@ -124,7 +126,7 @@ export function effectiveHeaterWatts(
 
   const gross =
     rate.ratePerHour * thermalMassKwhPerK(volumeLitres) * 1000 +
-    heatLossPerKelvin(volumeLitres) * (rate.meanWaterC - ambientC);
+    uaWPerK * (rate.meanWaterC - ambientC);
 
   // A wild observation shouldn't produce a wild prediction. Keep it within a
   // believable band around the nameplate figure.
@@ -133,6 +135,102 @@ export function effectiveHeaterWatts(
     Math.min(NAMEPLATE_HEATER_WATTS * 1.5, gross),
   );
   return { watts: Math.round(watts), measured: true, samples: rate.samples };
+}
+
+// --- Learning the tub's real insulation ----------------------------------------
+//
+// The mirror of the heating case, and arguably more valuable: heat LOSS is the
+// number the app was worst at guessing. A generic uninsulated tub is assumed at
+// 3 W/m2K, but a full cover package measures nearer 0.5 — a five-fold error in
+// every standby cost and a half-hour error in every heat-up.
+//
+// The two regimes are cleanly separated by their size. Standing loss under a
+// full cover is around 0.1 °C/h; an hour with the lid off is 1-1.5 °C/h. So
+// anything cooling faster than this threshold is a soak (or a top-up with cold
+// water) and must not be mistaken for the tub's insulation.
+const MAX_STANDING_LOSS_C_PER_H = 0.5;
+const MIN_STANDING_LOSS_C_PER_H = 0.01;
+export const MIN_COOLING_SAMPLES = 5;
+
+export interface CoolingRate {
+  /** °C per hour lost while standing, cover on. */
+  ratePerHour: number | null;
+  samples: number;
+  meanWaterC: number | null;
+}
+
+export function observedCoolingRate(rows: TempRow[]): CoolingRate {
+  const points = rows
+    .map((r) => ({ t: new Date(r.measured_at).getTime(), c: toNum(r.temperature_c) }))
+    .filter((x): x is { t: number; c: number } => Number.isFinite(x.t) && x.c !== null)
+    .sort((a, b) => a.t - b.t);
+
+  const rates: number[] = [];
+  const temps: number[] = [];
+
+  for (let i = 1; i < points.length; i += 1) {
+    const prev = points[i - 1];
+    const cur = points[i];
+    const gapHours = (cur.t - prev.t) / HOUR_MS;
+    if (gapHours < MIN_GAP_MINUTES / 60 || gapHours > MAX_GAP_HOURS) continue;
+
+    const drop = (prev.c - cur.c) / gapHours; // positive when cooling
+    if (drop < MIN_STANDING_LOSS_C_PER_H || drop > MAX_STANDING_LOSS_C_PER_H) continue;
+
+    rates.push(drop);
+    temps.push((prev.c + cur.c) / 2);
+  }
+
+  if (rates.length < MIN_COOLING_SAMPLES) {
+    return { ratePerHour: null, samples: rates.length, meanWaterC: null };
+  }
+
+  // The median here, not a high percentile: unlike heating — where partial
+  // intervals understate a fixed capability — we want the typical standing
+  // loss, and the extremes are draughty nights and mild afternoons either side.
+  const sorted = [...rates].sort((a, b) => a - b);
+  return {
+    ratePerHour: Math.round(sorted[Math.floor(sorted.length / 2)] * 1000) / 1000,
+    samples: rates.length,
+    meanWaterC:
+      Math.round((temps.reduce((a, b) => a + b, 0) / temps.length) * 10) / 10,
+  };
+}
+
+export type HeatLossBasis = "measured" | "setting" | "estimated";
+
+/**
+ * The heat-loss coefficient to actually use, and where it came from. Order:
+ * what the probe has watched, then what the user entered, then the generic
+ * uninsulated fallback.
+ */
+export function resolveHeatLoss(opts: {
+  cooling: CoolingRate | null;
+  ambientC: number;
+  savedWPerK?: number | null;
+  volumeLitres: number;
+}): { uaWPerK: number; basis: HeatLossBasis; standingLossCPerH: number } {
+  const { cooling, ambientC, savedWPerK, volumeLitres } = opts;
+
+  if (cooling?.ratePerHour != null && cooling.meanWaterC != null) {
+    const deltaT = cooling.meanWaterC - ambientC;
+    const ua = heatLossFromStandingLoss(cooling.ratePerHour, deltaT, volumeLitres);
+    if (ua !== null && ua > 0) {
+      return { uaWPerK: ua, basis: "measured", standingLossCPerH: cooling.ratePerHour };
+    }
+  }
+
+  const ua =
+    savedWPerK != null && savedWPerK > 0
+      ? savedWPerK
+      : defaultHeatLossPerKelvin(volumeLitres);
+
+  return {
+    uaWPerK: ua,
+    basis: savedWPerK != null && savedWPerK > 0 ? "setting" : "estimated",
+    standingLossCPerH:
+      Math.round(((ua * 25) / 1000 / thermalMassKwhPerK(volumeLitres)) * 1000) / 1000,
+  };
 }
 
 // --- The plan ------------------------------------------------------------------
@@ -150,6 +248,7 @@ export interface HeatingPlanInput {
   ambientC: number;
   watts: number;
   volumeLitres: number;
+  uaWPerK?: number;
   pricePerKwh?: number;
   now?: Date;
 }
@@ -173,6 +272,7 @@ export function heatingPlan(input: HeatingPlanInput): HeatingPlan | null {
   const { currentC, targetC, readyAt, ambientC, watts, volumeLitres } = input;
   const now = input.now ?? new Date();
   const pricePerKwh = input.pricePerKwh ?? 0.27;
+  const ua = input.uaWPerK ?? defaultHeatLossPerKelvin(volumeLitres);
 
   if (currentC === null || !Number.isFinite(currentC)) return null;
   if (!Number.isFinite(readyAt.getTime())) return null;
@@ -190,7 +290,7 @@ export function heatingPlan(input: HeatingPlanInput): HeatingPlan | null {
 
   if (currentC >= targetC) return { ...empty, alreadyWarmEnough: true };
 
-  const raw = heatUpHours(currentC, targetC, ambientC, watts, volumeLitres);
+  const raw = heatUpHours(currentC, targetC, ambientC, watts, volumeLitres, ua);
   if (raw === null) {
     return {
       ...empty,
@@ -224,9 +324,10 @@ export function reachableByC(
   ambientC: number,
   watts: number,
   volumeLitres: number,
+  uaWPerK: number = defaultHeatLossPerKelvin(volumeLitres),
 ): number {
-  const equilibrium = equilibriumTempC(ambientC, watts, volumeLitres);
-  const uaKw = heatLossPerKelvin(volumeLitres) / 1000;
+  const equilibrium = equilibriumTempC(ambientC, watts, uaWPerK);
+  const uaKw = uaWPerK / 1000;
   const tau = thermalMassKwhPerK(volumeLitres) / uaKw;
   const reached =
     equilibrium - (equilibrium - fromC) * Math.exp(-hoursAvailable / tau);
@@ -448,6 +549,7 @@ export function keepWarmVsReheat(opts: {
   coolsToC: number;
   watts: number;
   volumeLitres: number;
+  uaWPerK?: number;
   pricePerKwh?: number;
 }): KeepWarmComparison | null {
   const {
@@ -459,12 +561,13 @@ export function keepWarmVsReheat(opts: {
     volumeLitres,
   } = opts;
   const price = opts.pricePerKwh ?? 0.27;
+  const ua = opts.uaWPerK ?? defaultHeatLossPerKelvin(volumeLitres);
   if (soaksPerWeek <= 0) return null;
 
   const keepWarmWeekly =
-    standbyKwhPerDay(targetC, ambientC, volumeLitres) * 7 * price;
+    standbyKwhPerDay(targetC, ambientC, volumeLitres, ua) * 7 * price;
 
-  const hours = heatUpHours(coolsToC, targetC, ambientC, watts, volumeLitres);
+  const hours = heatUpHours(coolsToC, targetC, ambientC, watts, volumeLitres, ua);
   if (hours === null) return null;
   const reheatWeekly = heatUpKwh(hours, watts) * soaksPerWeek * price;
 
