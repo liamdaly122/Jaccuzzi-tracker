@@ -615,7 +615,9 @@ export default async function DashboardPage() {
           summary={
             advisories.length > 0
               ? `${advisories.length} to note`
-              : weather.locationName ?? undefined
+              : weather.days[0]
+                ? `${Math.round(weather.days[0].tempMin)}–${Math.round(weather.days[0].tempMax)}°`
+                : undefined
           }
         >
           <div className="grid grid-cols-3 gap-2 text-center">

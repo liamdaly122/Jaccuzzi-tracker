@@ -72,9 +72,17 @@ export default function CollapsibleCard({
         className="flex w-full items-center gap-2 text-left"
       >
         {icon ? <Icon name={icon} size={18} className="shrink-0 text-brand-600" /> : null}
-        <span className="flex-1 font-semibold text-slate-800">{title}</span>
+        <span className="min-w-0 flex-1 truncate font-semibold text-slate-800">
+          {title}
+        </span>
+        {/* Must be allowed to shrink: a long summary would otherwise push the
+            chevron clean off the right edge of the card. On a very narrow phone
+            there isn't room for both, and the title is the one you need — so
+            the summary drops out entirely rather than truncating the heading. */}
         {!open && summary ? (
-          <span className="num-tabular shrink-0 text-sm text-slate-500">{summary}</span>
+          <span className="num-tabular min-w-0 max-w-[55%] truncate text-sm text-slate-500 max-[359px]:hidden">
+            {summary}
+          </span>
         ) : null}
         <Icon
           name="chevron"

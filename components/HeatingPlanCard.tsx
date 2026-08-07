@@ -93,7 +93,9 @@ function Timeline({
   readyAt: Date;
 }) {
   const W = 300;
-  const H = 30;
+  // Tall enough for the labels' descenders — the "y" of "ready" sits below the
+  // baseline, and at H = 30 the viewBox sliced it off.
+  const H = 32;
   const padX = 6;
   const plotW = W - padX * 2;
 
@@ -130,10 +132,10 @@ function Timeline({
         stroke="#fff"
         strokeWidth={2}
       />
-      <text x={padX} y={H - 1} fontSize={9} fill={MUTED}>
+      <text x={padX} y={H - 4} fontSize={9} fill={MUTED}>
         {clockTime(now)} now
       </text>
-      <text x={padX + plotW} y={H - 1} fontSize={9} fill={MUTED} textAnchor="end">
+      <text x={padX + plotW} y={H - 4} fontSize={9} fill={MUTED} textAnchor="end">
         {clockTime(readyAt)} ready
       </text>
     </svg>
@@ -269,8 +271,8 @@ export default function HeatingPlanCard({
         Heating plan
       </h2>
 
-      <div className="flex gap-3">
-        <label className="flex-1">
+      <div className="flex flex-wrap items-start gap-3">
+        <label className="min-w-[7.5rem] flex-1">
           <span className="text-xs font-medium uppercase tracking-wide text-slate-500">
             Ready by
           </span>
@@ -285,7 +287,7 @@ export default function HeatingPlanCard({
           </span>
         </label>
 
-        <div>
+        <div className="shrink-0">
           <span className="text-xs font-medium uppercase tracking-wide text-slate-500">
             At
           </span>
