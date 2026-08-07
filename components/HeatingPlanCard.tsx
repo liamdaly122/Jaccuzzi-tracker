@@ -16,7 +16,9 @@ import {
   heatingPlan,
   keepWarmVsReheat,
   nextOccurrenceOf,
+  nextScheduledSoak,
   reachableByC,
+  type HeatingSchedule,
   type KeepWarmComparison,
 } from "@/lib/heating";
 import { TEMP_MAX_C, TEMP_MIN_C } from "@/lib/chemistry";
@@ -27,6 +29,29 @@ const READY = "#0ca30c";
 const MUTED = "#94a3b8";
 
 const HOUR_MS = 60 * 60 * 1000;
+
+// Sunday-first, matching Date.getDay().
+const DAY_LABELS = ["S", "M", "T", "W", "T", "F", "S"];
+const DAY_NAMES = [
+  "Sunday",
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
+];
+
+function describeDays(weekdays: number[]): string {
+  if (weekdays.length === 7) return "every day";
+  if (weekdays.length === 5 && [1, 2, 3, 4, 5].every((d) => weekdays.includes(d))) {
+    return "weekdays";
+  }
+  if (weekdays.length === 2 && weekdays.includes(0) && weekdays.includes(6)) {
+    return "weekends";
+  }
+  return weekdays.map((d) => DAY_NAMES[d].slice(0, 3)).join(", ");
+}
 
 // A "HH:MM" value for a time input, in the browser's own timezone.
 function toTimeInput(d: Date): string {
@@ -131,6 +156,8 @@ export interface HeatingPlanCardProps {
   /** Pre-computed on the server; independent of the chosen time. */
   keepWarm: KeepWarmComparison | null;
   patternNote: string | null;
+  /** The saved schedule, when there is one. */
+  schedule: HeatingSchedule | null;
 }
 
 export default function HeatingPlanCard({
@@ -146,21 +173,56 @@ export default function HeatingPlanCard({
   nowIso,
   keepWarm,
   patternNote,
+  schedule,
 }: HeatingPlanCardProps) {
-  const [readyTime, setReadyTime] = useState(() =>
-    toTimeInput(new Date(defaultReadyAtIso)),
+  // Seed straight from the saved schedule when there is one. Deriving it from
+  // the resolved date instead would let a second's rounding make a freshly
+  // loaded, unmodified schedule look edited.
+  const [readyTime, setReadyTime] = useState(
+    () => schedule?.time ?? toTimeInput(new Date(defaultReadyAtIso)),
   );
   const [target, setTarget] = useState(targetC);
   const [savingTarget, setSavingTarget] = useState(false);
+  const [saved, setSaved] = useState<HeatingSchedule | null>(schedule);
+  const [days, setDays] = useState<number[]>(
+    () => schedule?.weekdays ?? [0, 1, 2, 3, 4, 5, 6],
+  );
+  const [savingSchedule, setSavingSchedule] = useState(false);
   // Start from the server's clock so the first client render matches, then
   // correct to the real one — the same hydration-safe trick GuideRunner uses.
   const [now, setNow] = useState(() => new Date(nowIso));
   useEffect(() => setNow(new Date()), []);
 
-  const readyAt = useMemo(
-    () => nextOccurrenceOf(readyTime, now) ?? new Date(defaultReadyAtIso),
-    [readyTime, now, defaultReadyAtIso],
-  );
+  // A saved schedule decides the day as well as the time; without one, the next
+  // time that clock time comes round is the best we can do.
+  const readyAt = useMemo(() => {
+    if (saved) {
+      const next = nextScheduledSoak({ ...saved, time: readyTime }, now);
+      if (next) return next;
+    }
+    return nextOccurrenceOf(readyTime, now) ?? new Date(defaultReadyAtIso);
+  }, [saved, readyTime, now, defaultReadyAtIso]);
+
+  const dirty =
+    saved === null ||
+    saved.time !== readyTime ||
+    saved.weekdays.join() !== [...days].sort((a, b) => a - b).join();
+
+  async function saveSchedule(next: HeatingSchedule | null) {
+    setSavingSchedule(true);
+    try {
+      const res = await fetch("/api/heating-schedule", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ schedule: next }),
+      });
+      if (res.ok) setSaved(next);
+    } catch {
+      // Leave it unsaved rather than pretending; the button stays available.
+    } finally {
+      setSavingSchedule(false);
+    }
+  }
 
   // Persist immediately: this is a standing preference, not a one-off, and it
   // has to reach the morning push too. Optimistic — the number on screen moves
@@ -262,9 +324,75 @@ export default function HeatingPlanCard({
           ) : null}
         </div>
       </div>
-      {patternNote ? (
-        <p className="mt-1 text-xs text-slate-400">{patternNote}</p>
-      ) : null}
+      {/* Which days this applies to — the half that makes it a schedule
+          rather than a one-off. */}
+      <div className="mt-3">
+        <span className="text-xs font-medium uppercase tracking-wide text-slate-500">
+          On these days
+        </span>
+        <div className="mt-1.5 flex gap-1">
+          {DAY_LABELS.map((label, day) => {
+            const on = days.includes(day);
+            return (
+              <button
+                key={day}
+                type="button"
+                aria-pressed={on}
+                aria-label={DAY_NAMES[day]}
+                onClick={() =>
+                  setDays((prev) =>
+                    prev.includes(day)
+                      ? prev.filter((d) => d !== day)
+                      : [...prev, day].sort((a, b) => a - b),
+                  )
+                }
+                className={`h-9 flex-1 rounded-lg border text-sm font-medium transition ${
+                  on
+                    ? "border-brand-500 bg-brand-500 text-white"
+                    : "border-slate-300 bg-white text-slate-500"
+                }`}
+              >
+                {label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="mt-2 flex items-center justify-between gap-2">
+        {saved && !dirty ? (
+          <>
+            <p className="flex items-center gap-1.5 text-xs font-medium text-emerald-700">
+              <Icon name="check-circle" size={14} />
+              Saved — {describeDays(saved.weekdays)} at {saved.time}
+            </p>
+            <button
+              type="button"
+              onClick={() => saveSchedule(null)}
+              disabled={savingSchedule}
+              className="text-xs font-medium text-slate-400 underline underline-offset-2 hover:text-slate-600"
+            >
+              Forget it
+            </button>
+          </>
+        ) : (
+          <>
+            <p className="text-xs text-slate-400">
+              {saved ? "Unsaved changes." : patternNote}
+            </p>
+            <button
+              type="button"
+              disabled={savingSchedule || days.length === 0}
+              onClick={() =>
+                saveSchedule({ enabled: true, weekdays: days, time: readyTime })
+              }
+              className="shrink-0 rounded-xl bg-brand-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-brand-700 disabled:opacity-40"
+            >
+              {savingSchedule ? "Saving…" : "Save this schedule"}
+            </button>
+          </>
+        )}
+      </div>
 
       {/* The answer */}
       <div className="mt-3">

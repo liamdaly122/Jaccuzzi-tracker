@@ -288,7 +288,11 @@ This uses a free service with no key needed.
   from your tub size; once the probe has recorded a few real heat-ups it uses
   what *your* tub actually manages. It also tells you whether it's cheaper to
   leave it hot or let it cool between soaks — that flips somewhere around three
-  soaks a week, so it's genuinely worth checking. Set the temperature you
+  soaks a week, so it's genuinely worth checking. **Save your schedule** — pick
+  the days and the time and tap Save — and the card opens on it every time and
+  the morning reminder follows it. (Without a saved schedule the app guesses
+  from the soaks you've logged, which stops working if you stop logging.) Set
+  the temperature you
   actually soak at with the +/− buttons on the card (up to 40 °C, which is the
   hottest the tub will go) — it saves straight away and everything else follows
   it. On days you'd normally soak, the morning push says when to flick the

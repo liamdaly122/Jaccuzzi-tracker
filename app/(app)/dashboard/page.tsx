@@ -39,8 +39,9 @@ import { hibernationState, winterWindow } from "@/lib/winter";
 import {
   effectiveHeaterWatts,
   keepWarmVsReheat,
-  nextSoakTime,
   observedHeatingRate,
+  parseHeatingSchedule,
+  resolveReadyAt,
   soakPattern,
   soaksPerWeek,
 } from "@/lib/heating";
@@ -232,7 +233,9 @@ export default async function DashboardPage() {
     usageRows = [];
   }
   const pattern = soakPattern(usageRows);
-  const readyAt = nextSoakTime(pattern, now);
+  // A schedule they saved beats one we inferred from logged soaks.
+  const schedule = parseHeatingSchedule(settings.heating_schedule);
+  const { readyAt, source: readySource } = resolveReadyAt({ schedule, pattern, now });
 
   // Weather (only when a location is set; fetch failures just hide the card).
   let weather: WeatherForecast | null = null;
@@ -267,9 +270,10 @@ export default async function DashboardPage() {
           volumeLitres: config.volumeLitres,
         })
       : null;
-  const patternNote = pattern
-    ? `Pre-filled from the ${pattern.soaks} soaks you've logged — change it if tonight's different.`
-    : "Log a few soaks and I'll learn when you usually get in.";
+  const patternNote =
+    readySource === "pattern" && pattern
+      ? `Guessed from the ${pattern.soaks} soaks you've logged — save it to make it stick.`
+      : "Save a schedule and the morning reminder will follow it.";
 
   return (
     <div className="space-y-4">
@@ -328,6 +332,7 @@ export default async function DashboardPage() {
         nowIso={now.toISOString()}
         keepWarm={keepWarm}
         patternNote={patternNote}
+        schedule={schedule}
       />
 
       {/* Sanitiser drift, explained in plain terms */}

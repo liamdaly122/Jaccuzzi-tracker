@@ -4,8 +4,9 @@ import { hibernationState, winterWindow } from "@/lib/winter";
 import {
   effectiveHeaterWatts,
   heatingPlan,
-  nextSoakTime,
   observedHeatingRate,
+  parseHeatingSchedule,
+  resolveReadyAt,
   soakPattern,
 } from "@/lib/heating";
 import {
@@ -216,7 +217,13 @@ async function handle(request: NextRequest) {
     try {
       const usageRows = await getRecentUsage(60);
       const pattern = soakPattern(usageRows);
-      const readyAt = nextSoakTime(pattern, now);
+      // The saved schedule is why this reminder no longer depends on the user
+      // remembering to log every soak.
+      const { readyAt } = resolveReadyAt({
+        schedule: parseHeatingSchedule(settings.heating_schedule),
+        pattern,
+        now,
+      });
       const isToday = readyAt.toDateString() === now.toDateString();
       const waterC = probeWaterC;
 
