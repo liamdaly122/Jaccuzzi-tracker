@@ -3,6 +3,8 @@ import {
   calculateRecommendations,
   DEFAULT_TARGET_RANGES,
   DEFAULT_DOSING_CONSTANTS,
+  TEMP_MIN_C,
+  TEMP_MAX_C,
   type SpaConfig,
   type TestReadingInput,
 } from "../lib/chemistry";
@@ -427,5 +429,18 @@ describe("ORP sanitiser mode", () => {
     );
     const sanitiser = calc.recommendations.find((r) => r.order === 3)!;
     expect(sanitiser.amountGrams).toBeGreaterThan(0);
+  });
+});
+
+describe("soak temperature target", () => {
+  it("defaults to a sensible 38 °C", () => {
+    expect(DEFAULT_TARGET_RANGES.tempTarget).toBe(38);
+  });
+
+  it("sits inside the range the tub itself allows", () => {
+    // 40 C is both the standard hot-tub safety ceiling and the Lay-Z-Spa's max.
+    expect(TEMP_MAX_C).toBe(40);
+    expect(DEFAULT_TARGET_RANGES.tempTarget).toBeGreaterThanOrEqual(TEMP_MIN_C);
+    expect(DEFAULT_TARGET_RANGES.tempTarget).toBeLessThanOrEqual(TEMP_MAX_C);
   });
 });

@@ -15,9 +15,11 @@ import Icon from "./Icon";
 import {
   heatingPlan,
   keepWarmVsReheat,
+  nextOccurrenceOf,
   reachableByC,
   type KeepWarmComparison,
 } from "@/lib/heating";
+import { TEMP_MAX_C, TEMP_MIN_C } from "@/lib/chemistry";
 
 const TRACK = "#e2e8f0";
 const HEATING = "#fab219";
@@ -26,12 +28,10 @@ const MUTED = "#94a3b8";
 
 const HOUR_MS = 60 * 60 * 1000;
 
-// A datetime-local value in the browser's own timezone.
-function toLocalInput(d: Date): string {
+// A "HH:MM" value for a time input, in the browser's own timezone.
+function toTimeInput(d: Date): string {
   const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(
-    d.getHours(),
-  )}:${pad(d.getMinutes())}`;
+  return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
 function clockTime(d: Date): string {
@@ -50,10 +50,13 @@ function dayWord(d: Date, now: Date): string {
 }
 
 function hoursWord(hours: number): string {
-  if (hours < 1) return `${Math.round(hours * 60)} minutes`;
-  const h = Math.floor(hours);
-  const m = Math.round((hours - h) * 60);
-  return m === 0 ? `${h} hours` : `${h}h ${m}m`;
+  const totalMinutes = Math.round(hours * 60);
+  if (totalMinutes < 60) return `${totalMinutes} minutes`;
+  // Round to minutes FIRST, so 1.999 h reads "2 hours" rather than "1h 60m".
+  const h = Math.floor(totalMinutes / 60);
+  const m = totalMinutes % 60;
+  if (m === 0) return h === 1 ? "1 hour" : `${h} hours`;
+  return `${h}h ${m}m`;
 }
 
 /** now -> switch on -> ready, so the wait is a shape rather than a number. */
@@ -144,21 +147,46 @@ export default function HeatingPlanCard({
   keepWarm,
   patternNote,
 }: HeatingPlanCardProps) {
-  const [readyAtLocal, setReadyAtLocal] = useState(() =>
-    toLocalInput(new Date(defaultReadyAtIso)),
+  const [readyTime, setReadyTime] = useState(() =>
+    toTimeInput(new Date(defaultReadyAtIso)),
   );
+  const [target, setTarget] = useState(targetC);
+  const [savingTarget, setSavingTarget] = useState(false);
   // Start from the server's clock so the first client render matches, then
   // correct to the real one — the same hydration-safe trick GuideRunner uses.
   const [now, setNow] = useState(() => new Date(nowIso));
   useEffect(() => setNow(new Date()), []);
 
-  const readyAt = useMemo(() => new Date(readyAtLocal), [readyAtLocal]);
+  const readyAt = useMemo(
+    () => nextOccurrenceOf(readyTime, now) ?? new Date(defaultReadyAtIso),
+    [readyTime, now, defaultReadyAtIso],
+  );
+
+  // Persist immediately: this is a standing preference, not a one-off, and it
+  // has to reach the morning push too. Optimistic — the number on screen moves
+  // as soon as it's tapped and the save catches up.
+  async function saveTarget(next: number) {
+    const clamped = Math.min(TEMP_MAX_C, Math.max(TEMP_MIN_C, next));
+    setTarget(clamped);
+    setSavingTarget(true);
+    try {
+      await fetch("/api/soak-target", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tempTarget: clamped }),
+      });
+    } catch {
+      // The figure on screen is still right for this session.
+    } finally {
+      setSavingTarget(false);
+    }
+  }
 
   const plan = useMemo(
     () =>
       heatingPlan({
         currentC,
-        targetC,
+        targetC: target,
         readyAt,
         ambientC,
         watts,
@@ -166,7 +194,7 @@ export default function HeatingPlanCard({
         pricePerKwh,
         now,
       }),
-    [currentC, targetC, readyAt, ambientC, watts, volumeLitres, pricePerKwh, now],
+    [currentC, target, readyAt, ambientC, watts, volumeLitres, pricePerKwh, now],
   );
 
   // Nothing useful to say without a live water temperature.
@@ -184,17 +212,56 @@ export default function HeatingPlanCard({
         Heating plan
       </h2>
 
-      <label className="block">
-        <span className="text-xs font-medium uppercase tracking-wide text-slate-500">
-          Ready by
-        </span>
-        <input
-          type="datetime-local"
-          value={readyAtLocal}
-          onChange={(e) => setReadyAtLocal(e.target.value)}
-          className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm"
-        />
-      </label>
+      <div className="flex gap-3">
+        <label className="flex-1">
+          <span className="text-xs font-medium uppercase tracking-wide text-slate-500">
+            Ready by
+          </span>
+          <input
+            type="time"
+            value={readyTime}
+            onChange={(e) => setReadyTime(e.target.value)}
+            className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm"
+          />
+          <span className="mt-1 block text-xs text-slate-400">
+            {dayWord(readyAt, now)}
+          </span>
+        </label>
+
+        <div>
+          <span className="text-xs font-medium uppercase tracking-wide text-slate-500">
+            At
+          </span>
+          <div className="mt-1 flex items-center gap-1">
+            <button
+              type="button"
+              aria-label="Cooler"
+              disabled={savingTarget || target <= TEMP_MIN_C}
+              onClick={() => saveTarget(target - 0.5)}
+              className="h-9 w-9 rounded-xl border border-slate-300 text-lg font-medium text-slate-600 disabled:opacity-40"
+            >
+              −
+            </button>
+            <span className="num-tabular w-16 text-center text-lg font-bold text-slate-900">
+              {target}&nbsp;°C
+            </span>
+            <button
+              type="button"
+              aria-label="Warmer"
+              disabled={savingTarget || target >= TEMP_MAX_C}
+              onClick={() => saveTarget(target + 0.5)}
+              className="h-9 w-9 rounded-xl border border-slate-300 text-lg font-medium text-slate-600 disabled:opacity-40"
+            >
+              +
+            </button>
+          </div>
+          {target >= TEMP_MAX_C ? (
+            <span className="mt-1 block text-right text-xs text-slate-400">
+              tub&apos;s maximum
+            </span>
+          ) : null}
+        </div>
+      </div>
       {patternNote ? (
         <p className="mt-1 text-xs text-slate-400">{patternNote}</p>
       ) : null}
@@ -215,7 +282,7 @@ export default function HeatingPlanCard({
           <div className="rounded-xl bg-red-50 p-3">
             <p className="flex items-center gap-2 font-semibold text-red-800">
               <Icon name="alert-triangle" size={17} />
-              Can&apos;t reach {targetC}&nbsp;°C in this weather
+              Can&apos;t reach {target}&nbsp;°C in this weather
             </p>
             <p className="mt-1 text-sm text-red-800">
               At {Math.round(ambientC)}&nbsp;°C outside, the heater loses as much
@@ -250,7 +317,7 @@ export default function HeatingPlanCard({
             </p>
             <p className="text-sm text-slate-600">
               {dayWord(plan.switchOnAt!, now)} — {hoursWord(plan.hours)} from{" "}
-              {currentC}&nbsp;°C to {targetC}&nbsp;°C, about {plan.kwh}&nbsp;kWh
+              {currentC}&nbsp;°C to {target}&nbsp;°C, about {plan.kwh}&nbsp;kWh
               (£{plan.cost.toFixed(2)}).
             </p>
           </div>

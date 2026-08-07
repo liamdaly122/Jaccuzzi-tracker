@@ -33,9 +33,6 @@ import {
 import { sendNtfy } from "@/lib/ntfy";
 
 export const runtime = "nodejs";
-
-// The temperature people actually soak at.
-const SOAK_TARGET_C = 38;
 export const dynamic = "force-dynamic";
 
 // The daily scheduler. Vercel Cron calls this once a day and automatically
@@ -73,6 +70,7 @@ async function handle(request: NextRequest) {
   try {
     const settings = await getSettings();
     const config = toSpaConfig(settings);
+    const soakTargetC = config.targetRanges.tempTarget ?? 38;
 
     // Packed away for the winter? Routine nagging is noise, and noise is how an
     // app gets muted. Frost warnings survive, though — a tub that's still in the
@@ -227,7 +225,7 @@ async function handle(request: NextRequest) {
         const heater = effectiveHeaterWatts(rate, ambientForHeating, config.volumeLitres);
         const plan = heatingPlan({
           currentC: waterC,
-          targetC: SOAK_TARGET_C,
+          targetC: soakTargetC,
           readyAt,
           ambientC: ambientForHeating,
           watts: heater.watts,
@@ -238,7 +236,7 @@ async function handle(request: NextRequest) {
           const hhmm = (d: Date) =>
             d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
           heatingAlert = plan.tooLate
-            ? `Water is ${waterC}°C — too late to reach ${SOAK_TARGET_C}°C by ${hhmm(readyAt)}, switch on now to get part-way`
+            ? `Water is ${waterC}°C — too late to reach ${soakTargetC}°C by ${hhmm(readyAt)}, switch on now to get part-way`
             : `Switch the heater on by ${hhmm(plan.switchOnAt!)} to be ready for ${hhmm(readyAt)} (£${plan.cost.toFixed(2)})`;
         }
       }

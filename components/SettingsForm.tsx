@@ -28,6 +28,7 @@ const rangeFields: { key: keyof TargetRanges; label: string }[] = [
   { key: "brMax", label: "Bromine max" },
   { key: "chMin", label: "Calcium min" },
   { key: "chMax", label: "Calcium max" },
+  { key: "tempTarget", label: "Soak temperature (°C)" },
   { key: "cyaMin", label: "Stabiliser min" },
   { key: "cyaMax", label: "Stabiliser max" },
 ];

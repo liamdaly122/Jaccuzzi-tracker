@@ -45,6 +45,9 @@ export interface TargetRanges {
   cyaMin: number;
   cyaMax: number;
   cyaDrainAbove: number;
+  // The temperature you actually soak at. 40 C is the ceiling: it's both the
+  // standard hot-tub safety limit and the highest the Lay-Z-Spa will go.
+  tempTarget: number;
   // ORP (mV) — WHO puts the effective-sanitiser floor at 650; 650-750 is the
   // usual domestic target, and very high readings are harsh on skin and eyes.
   orpMin: number;
@@ -120,6 +123,9 @@ const DISCLAIMER =
   "Add chemicals gradually, run the pump to circulate, wait, then retest before adding more.";
 
 // Sensible default ranges (CDC / industry typical). Editable in Settings.
+export const TEMP_MIN_C = 20;
+export const TEMP_MAX_C = 40;
+
 export const DEFAULT_TARGET_RANGES: TargetRanges = {
   phIdealMin: 7.4,
   phIdealMax: 7.6,
@@ -136,6 +142,7 @@ export const DEFAULT_TARGET_RANGES: TargetRanges = {
   cyaMin: 20,
   cyaMax: 50,
   cyaDrainAbove: 100,
+  tempTarget: 38,
   orpMin: 650,
   orpMax: 750,
   orpDangerHigh: 850,

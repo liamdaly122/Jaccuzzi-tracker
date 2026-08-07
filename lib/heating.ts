@@ -282,6 +282,30 @@ export function soakPattern(rows: UsageRow[]): SoakPattern | null {
   };
 }
 
+/**
+ * Resolve a clock time ("20:00") to the next moment it comes round. Today if
+ * it's still ahead, tomorrow if it's gone — which is what someone soaking most
+ * days actually means, and saves them picking a date every time.
+ */
+export function nextOccurrenceOf(hhmm: string, now: Date = new Date()): Date | null {
+  const m = /^(\d{1,2}):(\d{2})$/.exec(hhmm.trim());
+  if (!m) return null;
+  const hour = Number(m[1]);
+  const minute = Number(m[2]);
+  if (hour < 0 || hour > 23 || minute < 0 || minute > 59) return null;
+
+  const candidate = new Date(now);
+  candidate.setHours(hour, minute, 0, 0);
+  if (candidate.getTime() > now.getTime()) return candidate;
+
+  // Build tomorrow from the date parts rather than adding 24 hours, so this
+  // stays correct across a daylight-saving change.
+  const tomorrow = new Date(now);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  tomorrow.setHours(hour, minute, 0, 0);
+  return tomorrow;
+}
+
 /** The next time matching the learned pattern, for pre-filling the picker. */
 export function nextSoakTime(
   pattern: SoakPattern | null,

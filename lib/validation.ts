@@ -56,6 +56,7 @@ const targetRangesSchema = z.object({
   brMax: z.number(),
   chMin: z.number(),
   chMax: z.number(),
+  tempTarget: z.number().min(20).max(40).optional(),
   cyaMin: z.number().optional(),
   cyaMax: z.number().optional(),
   orpMin: z.number().optional(),
@@ -115,3 +116,9 @@ export const winterSchema = z.object({
     .nullable(),
 });
 export type WinterInput = z.infer<typeof winterSchema>;
+
+// The soak temperature, set straight from the heating card. Clamped to the
+// range the tub itself allows.
+export const soakTargetSchema = z.object({
+  tempTarget: z.number().min(20).max(40),
+});

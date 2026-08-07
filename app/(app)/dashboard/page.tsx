@@ -57,9 +57,6 @@ import {
 
 export const dynamic = "force-dynamic";
 
-// What people actually soak at. Above 40 C is unsafe for most adults.
-const TARGET_WATER_C = 38;
-
 export default async function DashboardPage() {
   let settings, tasks, latest, recentReadings, lastNotification;
   try {
@@ -78,6 +75,8 @@ export default async function DashboardPage() {
 
   const now = new Date();
   const config = toSpaConfig(settings);
+  // The temperature they actually soak at, set on the heating card.
+  const soakTargetC = config.targetRanges.tempTarget ?? 38;
 
   // Packed away for the winter: none of what follows is about water that
   // exists, so show a calm panel instead of a dashboard full of stale numbers.
@@ -205,6 +204,7 @@ export default async function DashboardPage() {
     tempRows,
     drainTask?.last_completed_at ?? null,
     now,
+    soakTargetC,
   );
 
   // Built after the balance snapshot so a measured stabiliser reading can
@@ -260,7 +260,7 @@ export default async function DashboardPage() {
     perWeek > 0
       ? keepWarmVsReheat({
           soaksPerWeek: perWeek,
-          targetC: TARGET_WATER_C,
+          targetC: soakTargetC,
           ambientC,
           coolsToC: Math.max(ambientC + 2, 15),
           watts: heater.watts,
@@ -317,7 +317,7 @@ export default async function DashboardPage() {
 
       <HeatingPlanCard
         currentC={waterC}
-        targetC={TARGET_WATER_C}
+        targetC={soakTargetC}
         ambientC={ambientC}
         watts={heater.watts}
         measured={heater.measured}

@@ -451,6 +451,12 @@ export function lsiSnapshot(
   probeRows: TempRow[],
   fillStartIso: string | null = null,
   now: Date = new Date(),
+  /**
+   * The temperature to assume when the probe has nothing recent. Pass the
+   * user's soak target: heat is the multiplier that makes hot tubs scale, so
+   * running at 40 rather than 38 genuinely shifts the index.
+   */
+  assumedTempC: number = ASSUMED_TEMP_C,
 ): LsiSnapshot {
   const nowMs = now.getTime();
 
@@ -471,7 +477,7 @@ export function lsiSnapshot(
   const tempIsFresh =
     latestTemp !== undefined &&
     nowMs - latestTemp.t <= TEMP_FRESH_DAYS * 24 * 60 * 60 * 1000;
-  const temperatureC = tempIsFresh ? latestTemp.c : ASSUMED_TEMP_C;
+  const temperatureC = tempIsFresh ? latestTemp.c : assumedTempC;
 
   const missing: string[] = [];
   if (ph === null || alkalinityPpm === null) {

@@ -6,6 +6,7 @@ import {
   effectiveHeaterWatts,
   heatingPlan,
   keepWarmVsReheat,
+  nextOccurrenceOf,
   nextSoakTime,
   observedHeatingRate,
   reachableByC,
@@ -373,5 +374,73 @@ describe("keepWarmVsReheat", () => {
     const r = keepWarmVsReheat({ ...base, soaksPerWeek: 3 })!;
     const expected = standbyKwhPerDay(38, 12, V) * 7 * 0.27;
     expect(r.keepWarmWeekly).toBeCloseTo(expected, 1);
+  });
+});
+
+describe("nextOccurrenceOf", () => {
+  it("stays today when the time is still ahead", () => {
+    const now = new Date("2026-08-12T09:44:00");
+    const at = nextOccurrenceOf("13:00", now)!;
+    expect(at.getDate()).toBe(12);
+    expect(at.getHours()).toBe(13);
+    expect(at.getMinutes()).toBe(0);
+  });
+
+  it("rolls to tomorrow once the time has gone", () => {
+    // The reason the date picker went: 'too late for 13:00' is the wrong
+    // answer at 2pm when you soak most days — tomorrow's 13:00 is meant.
+    const now = new Date("2026-08-12T14:00:00");
+    const at = nextOccurrenceOf("13:00", now)!;
+    expect(at.getDate()).toBe(13);
+    expect(at.getHours()).toBe(13);
+  });
+
+  it("handles midnight and the end of a month", () => {
+    const at = nextOccurrenceOf("00:30", new Date("2026-08-31T23:50:00"))!;
+    expect(at.getMonth()).toBe(8); // September
+    expect(at.getDate()).toBe(1);
+    expect(at.getHours()).toBe(0);
+  });
+
+  it("always lands in the future", () => {
+    const now = new Date("2026-08-12T14:00:00");
+    for (const t of ["00:00", "13:59", "14:00", "14:01", "23:59"]) {
+      expect(nextOccurrenceOf(t, now)!.getTime()).toBeGreaterThan(now.getTime());
+    }
+  });
+
+  it("rejects anything that isn't a clock time", () => {
+    const now = new Date("2026-08-12T09:00:00");
+    for (const bad of ["", "nonsense", "25:00", "12:70", "12"]) {
+      expect(nextOccurrenceOf(bad, now)).toBeNull();
+    }
+  });
+});
+
+describe("soak temperature", () => {
+  it("takes longer to reach 40 °C than 38 °C — the bug that prompted this", () => {
+    const to38 = heatUpHours(30, 38, 14, P, V)!;
+    const to40 = heatUpHours(30, 40, 14, P, V)!;
+    expect(to40).toBeGreaterThan(to38);
+  });
+
+  it("a hotter target also costs more to hold", () => {
+    const at38 = keepWarmVsReheat({
+      soaksPerWeek: 5,
+      targetC: 38,
+      ambientC: 12,
+      coolsToC: 16,
+      watts: P,
+      volumeLitres: V,
+    })!;
+    const at40 = keepWarmVsReheat({
+      soaksPerWeek: 5,
+      targetC: 40,
+      ambientC: 12,
+      coolsToC: 16,
+      watts: P,
+      volumeLitres: V,
+    })!;
+    expect(at40.keepWarmWeekly).toBeGreaterThan(at38.keepWarmWeekly);
   });
 });
