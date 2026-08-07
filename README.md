@@ -297,6 +297,20 @@ This uses a free service with no key needed.
   hottest the tub will go) — it saves straight away and everything else follows
   it. On days you'd normally soak, the morning push says when to flick the
   switch.
+- **Running costs (Today screen):** what the tub actually costs — per day, month
+  and year, and per soak — split into keeping it warm, the lid being off while
+  you're in it, and the filtration pump. It also says whether it's cheaper to
+  hold it hot or let it cool, and what shutting down for winter would save.
+  Everything here rests on one number: how fast the water cools with the covers
+  on. The app measures that from your probe automatically, and you can enter
+  your own measurement on the card. **Worth doing** — without a figure it
+  assumes a bare uninsulated tub, which on a well-covered spa overstates the
+  running cost several times over.
+- **Collapsible cards:** tap any card heading on the Today screen to fold it
+  away, and it stays folded next time. Weather, water freshness, heater
+  protection and running costs start collapsed; the live probe and heating plan
+  stay open. (The "do not use the spa yet" safety warning can never be folded
+  away.)
 - **Heater protection (Today screen):** every other check looks at one number on
   its own. This one looks at pH, alkalinity, calcium **and water temperature
   together** — because they can each read "in range" while the combination

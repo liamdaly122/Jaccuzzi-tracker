@@ -130,3 +130,8 @@ export const heatingScheduleSchema = z.object({
   time: z.string().regex(/^([01]?\d|2[0-3]):[0-5]\d$/, "Use a 24-hour time like 13:00"),
 });
 export type HeatingScheduleInput = z.infer<typeof heatingScheduleSchema>;
+
+// A measured insulation figure, in watts per kelvin.
+export const heatLossSchema = z.object({
+  heatLossWPerK: z.number().positive().max(200).nullable(),
+});

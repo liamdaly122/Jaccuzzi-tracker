@@ -14,12 +14,10 @@ import { Card } from "./ui";
 import Icon from "./Icon";
 import {
   heatingPlan,
-  keepWarmVsReheat,
   nextOccurrenceOf,
   nextScheduledSoak,
   reachableByC,
   type HeatingSchedule,
-  type KeepWarmComparison,
 } from "@/lib/heating";
 import { TEMP_MAX_C, TEMP_MIN_C } from "@/lib/chemistry";
 
@@ -153,8 +151,6 @@ export interface HeatingPlanCardProps {
   pricePerKwh: number;
   defaultReadyAtIso: string;
   nowIso: string;
-  /** Pre-computed on the server; independent of the chosen time. */
-  keepWarm: KeepWarmComparison | null;
   patternNote: string | null;
   /** The saved schedule, when there is one. */
   schedule: HeatingSchedule | null;
@@ -171,7 +167,6 @@ export default function HeatingPlanCard({
   pricePerKwh,
   defaultReadyAtIso,
   nowIso,
-  keepWarm,
   patternNote,
   schedule,
 }: HeatingPlanCardProps) {
@@ -458,37 +453,9 @@ export default function HeatingPlanCard({
         </div>
       ) : null}
 
-      {/* Hold it hot, or let it go cold? */}
-      {keepWarm ? (
-        <div className="mt-3 rounded-xl bg-slate-50 p-3">
-          <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
-            You soak about {keepWarm.soaksPerWeek}&times; a week
-          </p>
-          <dl className="mt-1.5 space-y-1 text-sm">
-            <div className="flex justify-between gap-3">
-              <dt className="text-slate-600">Leave it hot</dt>
-              <dd className="num-tabular font-semibold text-slate-800">
-                £{keepWarm.keepWarmWeekly.toFixed(2)}/wk
-              </dd>
-            </div>
-            <div className="flex justify-between gap-3">
-              <dt className="text-slate-600">Let it cool, reheat each time</dt>
-              <dd className="num-tabular font-semibold text-slate-800">
-                £{keepWarm.reheatWeekly.toFixed(2)}/wk
-              </dd>
-            </div>
-          </dl>
-          <p className="mt-1.5 text-sm font-medium text-slate-800">
-            {keepWarm.cheaper === "keep_warm"
-              ? `At that rate it's cheaper to leave it at temperature — about £${keepWarm.savingWeekly.toFixed(2)} a week better than reheating from cold.`
-              : `At that rate it's cheaper to let it cool between soaks — about £${keepWarm.savingWeekly.toFixed(2)} a week better than holding it hot.`}
-          </p>
-        </div>
-      ) : null}
-
       <p className="mt-2 text-xs text-slate-400">
         {measured
-          ? `Timed from ${samples} real heat-ups on your own tub, adjusted for tonight's ${Math.round(ambientC)} °C.`
+          ? `Timed from ${samples} real heat-ups on your own tub.`
           : `Estimated from your tub size and a typical heater — I'll time your real heat-ups as the probe records them and tighten this up.`}{" "}
         Includes a half-hour of slack, since running on early costs pennies and
         running late spoils the soak.

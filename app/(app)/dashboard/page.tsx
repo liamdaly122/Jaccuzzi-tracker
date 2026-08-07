@@ -9,6 +9,8 @@ import ProbeCard from "@/components/ProbeCard";
 import QuickLinks from "@/components/QuickLinks";
 import HeaterProtectionCard from "@/components/HeaterProtectionCard";
 import HeatingPlanCard from "@/components/HeatingPlanCard";
+import CollapsibleCard from "@/components/CollapsibleCard";
+import RunningCostsCard from "@/components/RunningCostsCard";
 import {
   getSettings,
   toSpaConfig,
@@ -39,12 +41,16 @@ import { hibernationState, winterWindow } from "@/lib/winter";
 import {
   effectiveHeaterWatts,
   keepWarmVsReheat,
+  observedCoolingRate,
   observedHeatingRate,
   parseHeatingSchedule,
+  resolveHeatLoss,
   resolveReadyAt,
   soakPattern,
   soaksPerWeek,
 } from "@/lib/heating";
+import { runningCostSummary, seasonalComparison } from "@/lib/costs";
+import { impliedUValue } from "@/lib/thermal";
 import { getForecast, weatherAdvice, type WeatherForecast } from "@/lib/weather";
 import { getIopoolReading, isIopoolConfigured } from "@/lib/iopool";
 import { orpDrift } from "@/lib/probe";
@@ -257,7 +263,22 @@ export default async function DashboardPage() {
     today && Number.isFinite(today.tempMax) && Number.isFinite(today.tempMin)
       ? (today.tempMax + today.tempMin) / 2
       : 12;
-  const heater = effectiveHeaterWatts(rate, ambientC, config.volumeLitres);
+  // Insulation first: every heat figure below depends on it, and the generic
+  // uninsulated assumption is five times out for a tub with covers on.
+  const heatLoss = resolveHeatLoss({
+    cooling: observedCoolingRate(probeRows),
+    ambientC,
+    savedWPerK: settings.heat_loss_w_per_k === null
+      ? null
+      : Number(settings.heat_loss_w_per_k),
+    volumeLitres: config.volumeLitres,
+  });
+  const heater = effectiveHeaterWatts(
+    rate,
+    ambientC,
+    config.volumeLitres,
+    heatLoss.uaWPerK,
+  );
   const perWeek = soaksPerWeek(usageRows, now);
   const keepWarm =
     perWeek > 0
@@ -268,8 +289,24 @@ export default async function DashboardPage() {
           coolsToC: Math.max(ambientC + 2, 15),
           watts: heater.watts,
           volumeLitres: config.volumeLitres,
+          uaWPerK: heatLoss.uaWPerK,
         })
       : null;
+
+  // What it all actually costs to run.
+  const costInput = {
+    uaWPerK: heatLoss.uaWPerK,
+    targetC: soakTargetC,
+    ambientC,
+    volumeLitres: config.volumeLitres,
+    pricePerKwh: 0.2611,
+    soakHoursPerDay: perWeek > 0 ? Math.min(2, (perWeek * 1) / 7) : 0,
+    lidOffLossCPerH: 1.25,
+    filterHoursPerDay: probe?.filtrationHours ?? undefined,
+    soaksPerWeek: perWeek,
+  };
+  const costs = runningCostSummary(costInput);
+  const seasonal = seasonalComparison(costInput, 7);
   const patternNote =
     readySource === "pattern" && pattern
       ? `Guessed from the ${pattern.soaks} soaks you've logged — save it to make it stick.`
@@ -330,7 +367,6 @@ export default async function DashboardPage() {
         pricePerKwh={0.27}
         defaultReadyAtIso={readyAt.toISOString()}
         nowIso={now.toISOString()}
-        keepWarm={keepWarm}
         patternNote={patternNote}
         schedule={schedule}
       />
@@ -428,8 +464,13 @@ export default async function DashboardPage() {
       <HeaterProtectionCard snapshot={balance} />
 
       {/* Water freshness (smart drain & refill) */}
-      <Card>
-        <h2 className="mb-2 font-semibold text-slate-800">Water freshness</h2>
+      <CollapsibleCard
+        id="water-freshness"
+        title="Water freshness"
+        icon="droplet"
+        defaultOpen={false}
+        summary={verdict.headline}
+      >
 
         {/* The headline verdict, weighing every signal we have. */}
         <div
@@ -523,12 +564,16 @@ export default async function DashboardPage() {
         <p className="mt-2 text-xs text-slate-400">
           Change how many people use it in Settings.
         </p>
-      </Card>
+      </CollapsibleCard>
 
       {/* Coming up */}
-      <Card>
-        <div className="mb-3 flex items-center justify-between">
-          <h2 className="font-semibold text-slate-800">Coming up</h2>
+      <CollapsibleCard
+        id="coming-up"
+        title="Coming up"
+        icon="check-circle"
+        summary={dueTasks.length === 0 ? "All caught up" : `${dueTasks.length} due`}
+      >
+        <div className="mb-3 text-right">
           <Link href="/tasks" className="text-sm font-medium text-brand-600">
             All tasks →
           </Link>
@@ -558,20 +603,21 @@ export default async function DashboardPage() {
             ))}
           </ul>
         )}
-      </Card>
+      </CollapsibleCard>
 
       {/* Weather */}
       {weather && weather.days.length > 0 ? (
-        <Card>
-          <div className="mb-2 flex items-center justify-between">
-            <h2 className="font-semibold text-slate-800">Weather</h2>
-            {weather.locationName ? (
-              <span className="text-xs text-slate-400">
-                <Icon name="pin" size={12} className="mr-1 inline align-[-1px]" />
-                {weather.locationName}
-              </span>
-            ) : null}
-          </div>
+        <CollapsibleCard
+          id="weather"
+          title="Weather"
+          icon="sun"
+          defaultOpen={false}
+          summary={
+            advisories.length > 0
+              ? `${advisories.length} to note`
+              : weather.locationName ?? undefined
+          }
+        >
           <div className="grid grid-cols-3 gap-2 text-center">
             {weather.days.slice(0, 3).map((d) => (
               <div key={d.date} className="rounded-xl bg-slate-50 py-2">
@@ -609,8 +655,30 @@ export default async function DashboardPage() {
               Nothing weather-related to worry about right now.
             </p>
           )}
-        </Card>
+        </CollapsibleCard>
       ) : null}
+
+      {/* Reference rather than glanceable — what it costs, and the insulation
+          figure every heat number in the app rests on. */}
+      <CollapsibleCard
+        id="running-costs"
+        title="Running costs"
+        icon="bolt"
+        defaultOpen={false}
+        summary={`£${costs.daily.cost.toFixed(2)}/day`}
+      >
+        <RunningCostsCard
+          summary={costs}
+          seasonal={seasonal}
+          keepWarm={keepWarm}
+          basis={heatLoss.basis}
+          standingLossCPerH={heatLoss.standingLossCPerH}
+          impliedU={impliedUValue(heatLoss.uaWPerK, config.volumeLitres)}
+          pricePerKwh={0.2611}
+          deltaTK={Math.max(1, (waterC ?? soakTargetC) - ambientC)}
+          volumeLitres={config.volumeLitres}
+        />
+      </CollapsibleCard>
 
       <QuickLinks />
 

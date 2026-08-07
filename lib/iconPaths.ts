@@ -181,6 +181,7 @@ export const ICON_PATHS: Record<IconName, IconPrimitive[]> = {
     p("M12 3v18M4.2 7.5l15.6 9M19.8 7.5l-15.6 9"),
     p("M12 6.6 9.6 4.6M12 6.6l2.4-2M12 17.4l-2.4 2M12 17.4l2.4 2"),
   ],
+  chevron: [p("M6 9l6 6 6-6")],
   sun: [
     { t: "circle", cx: 12, cy: 12, r: 4.2 },
     p("M12 2.2v2.4M12 19.4v2.4M2.2 12h2.4M19.4 12h2.4"),

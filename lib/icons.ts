@@ -55,6 +55,7 @@ export const ICON_NAMES = [
   "drain",
   "snowflake",
   "sun",
+  "chevron",
 ] as const;
 
 export type IconName = (typeof ICON_NAMES)[number];

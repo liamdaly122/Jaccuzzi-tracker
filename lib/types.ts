@@ -23,6 +23,7 @@ export interface SpaSettings {
   dosing_constants: DosingConstants;
   avg_daily_bathers: number;
   heating_schedule: unknown | null;
+  heat_loss_w_per_k: number | null;
   winterised_at: string | null;
   winter_strategy: string | null;
   latitude: number | null;

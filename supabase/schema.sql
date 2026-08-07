@@ -91,6 +91,11 @@ alter table test_readings add column if not exists cyanuric_acid_ppm numeric(6, 
 -- copy, so the two can't drift apart.
 alter table spa_settings add column if not exists heating_schedule jsonb;
 
+-- Measured heat loss in watts per kelvin ("UA"). Stored rather than a U-value
+-- because U is coupled to whichever surface area was assumed, while UA is what
+-- the physics needs and is measurable straight off a cooling curve.
+alter table spa_settings add column if not exists heat_loss_w_per_k numeric;
+
 alter table spa_settings add column if not exists winterised_at timestamptz;
 alter table spa_settings add column if not exists winter_strategy text;
 
