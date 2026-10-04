@@ -2,8 +2,68 @@
 @tailwind components;
 @tailwind utilities;
 
+/* =============================================================================
+   Design tokens — "Checklist": calm teal ink on pool mist.
+   Stored as RGB channels so Tailwind's opacity modifiers work (bg-ink/50).
+   Every text pairing here was checked at >= 4.5:1 in both themes.
+   The dark set applies once <html> carries .theme-auto (it follows the phone).
+   ========================================================================== */
 :root {
   color-scheme: light;
+  --bg: 242 245 244;
+  --surface: 255 255 255;
+  --surface-2: 233 239 238;
+  --line: 213 223 222;
+  --track: 225 233 232;
+  --ink: 16 40 42;
+  --ink-2: 61 85 87;
+  --ink-3: 86 109 111;
+  --accent: 11 110 106;
+  --on-accent: 255 255 255;
+  --accent-ink: 10 102 98;
+  --accent-soft: 220 239 237;
+  --heat: 224 122 46;
+  --heat-ink: 168 75 12;
+  --heat-soft: 251 234 219;
+  --good: 30 142 74;
+  --good-ink: 20 107 55;
+  --good-soft: 225 242 230;
+  --warn: 224 154 26;
+  --warn-ink: 138 74 0;
+  --warn-soft: 252 239 213;
+  --bad: 208 59 59;
+  --bad-ink: 166 36 36;
+  --bad-soft: 251 227 225;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root.theme-auto {
+    color-scheme: dark;
+    --bg: 12 21 22;
+    --surface: 19 33 35;
+    --surface-2: 27 44 46;
+    --line: 36 55 57;
+    --track: 32 50 52;
+    --ink: 227 238 237;
+    --ink-2: 180 198 197;
+    --ink-3: 143 164 163;
+    --accent: 76 195 186;
+    --on-accent: 6 33 32;
+    --accent-ink: 111 211 203;
+    --accent-soft: 20 58 56;
+    --heat: 232 132 58;
+    --heat-ink: 242 161 92;
+    --heat-soft: 58 36 20;
+    --good: 61 186 106;
+    --good-ink: 130 217 160;
+    --good-soft: 18 48 30;
+    --warn: 237 170 53;
+    --warn-ink: 243 194 110;
+    --warn-soft: 51 38 12;
+    --bad: 236 100 100;
+    --bad-ink: 255 157 157;
+    --bad-soft: 59 22 22;
+  }
 }
 
 html,
@@ -13,7 +73,12 @@ body {
 }
 
 body {
-  @apply bg-slate-50 text-slate-800 antialiased;
+  @apply bg-bg text-ink antialiased;
+}
+
+:focus-visible {
+  outline: 2.5px solid rgb(var(--accent-ink));
+  outline-offset: 2px;
 }
 
 /* Make number inputs friendlier on mobile */
@@ -24,6 +89,18 @@ input[type="number"]::-webkit-outer-spin-button,
 input[type="number"]::-webkit-inner-spin-button {
   -webkit-appearance: none;
   margin: 0;
+}
+
+/* Sheets slide up; toasts rise. Both skip the motion when asked to. */
+@media (prefers-reduced-motion: no-preference) {
+  .anim-sheet { animation: sheet-up 0.26s cubic-bezier(0.2, 0.8, 0.2, 1); }
+  .anim-toast { animation: toast-in 0.2s ease-out; }
+}
+@keyframes sheet-up {
+  from { transform: translateY(28px); opacity: 0.5; }
+}
+@keyframes toast-in {
+  from { transform: translateY(10px); opacity: 0.4; }
 }
 
 /* =============================================================================

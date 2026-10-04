@@ -167,3 +167,29 @@ export function generateOccurrences(
 
   return occurrences;
 }
+
+// -----------------------------------------------------------------------------
+// planUndo — taking back a mis-tapped "Done". Only the newest completion can
+// be undone, and only for a short while, so an Undo button can never quietly
+// rewrite older history. The task's "last done" falls back to the completion
+// before it, or to never.
+// -----------------------------------------------------------------------------
+export const UNDO_WINDOW_MINUTES = 15;
+
+export interface CompletionLike {
+  id: number;
+  completed_at: string;
+}
+
+export function planUndo(
+  completionsNewestFirst: CompletionLike[],
+  now: Date = new Date(),
+): { deleteId: number; restoreTo: string | null } | null {
+  const [newest, previous] = completionsNewestFirst;
+  if (!newest) return null;
+  const age = now.getTime() - new Date(newest.completed_at).getTime();
+  if (!Number.isFinite(age) || age < 0 || age > UNDO_WINDOW_MINUTES * 60_000) {
+    return null;
+  }
+  return { deleteId: newest.id, restoreTo: previous?.completed_at ?? null };
+}

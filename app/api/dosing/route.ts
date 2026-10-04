@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getSupabase } from "@/lib/supabase";
-import { getRecentDosing } from "@/lib/data";
+import { completeTaskByKey, getRecentDosing } from "@/lib/data";
 import { dosingSchema } from "@/lib/validation";
 
 export const runtime = "nodejs";
@@ -42,5 +42,7 @@ export async function POST(request: NextRequest) {
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
+  // A shock dose IS the weekly shock job.
+  if (parsed.data.chemical === "mps_shock") await completeTaskByKey("shock");
   return NextResponse.json({ dosing: data });
 }

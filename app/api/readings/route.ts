@@ -6,6 +6,7 @@ import {
   getRecentReadings,
   getRecentProbeReadings,
   getTasks,
+  completeTaskByKey,
 } from "@/lib/data";
 import { readingSchema } from "@/lib/validation";
 import { calculateRecommendations } from "@/lib/chemistry";
@@ -77,6 +78,9 @@ export async function POST(request: NextRequest) {
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
+
+    // A saved test IS the "Test the water" job, so tick it off.
+    await completeTaskByKey("test_water");
 
     // Heater protection: pH, alkalinity, calcium and temperature judged
     // together. Best-effort — the reading is already saved, so nothing here may

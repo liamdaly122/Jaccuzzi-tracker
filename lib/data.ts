@@ -64,6 +64,28 @@ export async function getTasks(): Promise<MaintenanceTaskRow[]> {
   return (data ?? []) as MaintenanceTaskRow[];
 }
 
+/**
+ * Tick off a task by its key (e.g. "test_water") when something elsewhere
+ * proves it was done — saving a test, logging a shock dose. Best-effort: the
+ * thing that triggered it has already been saved and must not fail because of
+ * this.
+ */
+export async function completeTaskByKey(taskKey: string): Promise<void> {
+  try {
+    const supabase = getSupabase();
+    const { data } = await supabase
+      .from("maintenance_tasks")
+      .select("id")
+      .eq("task_key", taskKey)
+      .maybeSingle();
+    if (data?.id != null) {
+      await supabase.rpc("complete_task", { p_task_id: data.id, p_note: null });
+    }
+  } catch (err) {
+    console.error(`Could not tick off ${taskKey}:`, err);
+  }
+}
+
 export async function getRecentReadings(limit = 20): Promise<TestReadingRow[]> {
   const supabase = getSupabase();
   const { data, error } = await supabase

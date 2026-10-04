@@ -4,6 +4,8 @@ import {
   computeTaskLife,
   generateOccurrences,
   type OccurrenceTemplate,
+  planUndo,
+  UNDO_WINDOW_MINUTES,
 } from "../lib/tasks";
 
 const NOW = new Date("2026-07-24T12:00:00.000Z");
@@ -165,5 +167,35 @@ describe("generateOccurrences", () => {
     expect(() =>
       generateOccurrences(bad, new Date("2026-07-01"), new Date("2026-07-31"), NOW),
     ).toThrow();
+  });
+});
+
+describe("planUndo", () => {
+  const now = new Date("2026-10-04T14:10:00.000Z");
+  const minsAgo = (m: number) => new Date(now.getTime() - m * 60_000).toISOString();
+
+  it("takes back a tick made a moment ago, restoring the one before", () => {
+    const plan = planUndo(
+      [
+        { id: 9, completed_at: minsAgo(1) },
+        { id: 4, completed_at: "2026-09-27T10:00:00.000Z" },
+      ],
+      now,
+    );
+    expect(plan).toEqual({ deleteId: 9, restoreTo: "2026-09-27T10:00:00.000Z" });
+  });
+
+  it("goes back to never-done when it was the first completion", () => {
+    expect(planUndo([{ id: 1, completed_at: minsAgo(2) }], now)).toEqual({
+      deleteId: 1,
+      restoreTo: null,
+    });
+  });
+
+  it("refuses to rewrite older history", () => {
+    expect(
+      planUndo([{ id: 3, completed_at: minsAgo(UNDO_WINDOW_MINUTES + 1) }], now),
+    ).toBeNull();
+    expect(planUndo([], now)).toBeNull();
   });
 });

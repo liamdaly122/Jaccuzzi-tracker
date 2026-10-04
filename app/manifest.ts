@@ -8,8 +8,8 @@ export default function manifest(): MetadataRoute.Manifest {
       "Chemical dosing calculator and maintenance schedule for your hot tub.",
     start_url: "/dashboard",
     display: "standalone",
-    background_color: "#eff9ff",
-    theme_color: "#2385f0",
+    background_color: "#F2F5F4",
+    theme_color: "#0B6E6A",
     icons: [
       {
         src: "/icon-192.png",
