@@ -1,455 +1,481 @@
 "use client";
 
-import { useState } from "react";
-import Link from "next/link";
+// =============================================================================
+//  components/SettingsForm.tsx
+//  Settings as short grouped rows, each showing its current value. Tapping one
+//  opens just that setting with its own Save, so nothing is lost by wandering
+//  off and nobody has to scroll a wall of fields to change one number.
+// =============================================================================
+
+import { useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import type { SpaSettings } from "@/lib/types";
-import type { TargetRanges, DosingConstants } from "@/lib/chemistry";
+import {
+  DEFAULT_DOSING_CONSTANTS,
+  DEFAULT_TARGET_RANGES,
+  type DosingConstants,
+  type SanitizerType,
+  type SanitizerUnit,
+  type TargetRanges,
+} from "@/lib/chemistry";
 import { computeWaterChangeIntervalDays } from "@/lib/water";
-import { Button, Card, Field, inputClass } from "./ui";
+import { Button, Callout, Card, Row, Section, inputClass } from "./ui";
 import Icon from "./Icon";
+import Sheet from "./Sheet";
+import Stepper from "./Stepper";
+import CalibrationCard, { type Suggestion } from "./CalibrationCard";
+import { useToast } from "./Toaster";
+import type { IconName } from "@/lib/icons";
 
 interface Props {
   settings: SpaSettings;
   icsUrl: string | null;
+  suggestions: Suggestion[];
+  observationCount: number;
 }
 
-// Labels for the "advanced" numeric grids, so the UI isn't a wall of keys.
+// Soak temperature is left out: the Heat tab owns it.
 const rangeFields: { key: keyof TargetRanges; label: string }[] = [
-  { key: "phIdealMin", label: "pH ideal min" },
-  { key: "phIdealMax", label: "pH ideal max" },
-  { key: "phAcceptableMin", label: "pH acceptable min" },
-  { key: "phAcceptableMax", label: "pH acceptable max" },
-  { key: "taMin", label: "Alkalinity min" },
-  { key: "taMax", label: "Alkalinity max" },
-  { key: "fcMin", label: "Chlorine min" },
-  { key: "fcMax", label: "Chlorine max" },
-  { key: "brMin", label: "Bromine min" },
-  { key: "brMax", label: "Bromine max" },
-  { key: "chMin", label: "Calcium min" },
-  { key: "chMax", label: "Calcium max" },
-  { key: "tempTarget", label: "Soak temperature (°C)" },
-  { key: "cyaMin", label: "Stabiliser min" },
-  { key: "cyaMax", label: "Stabiliser max" },
+  { key: "phIdealMin", label: "pH ideal, low" },
+  { key: "phIdealMax", label: "pH ideal, high" },
+  { key: "phAcceptableMin", label: "pH acceptable, low" },
+  { key: "phAcceptableMax", label: "pH acceptable, high" },
+  { key: "taMin", label: "Alkalinity, low" },
+  { key: "taMax", label: "Alkalinity, high" },
+  { key: "fcMin", label: "Chlorine, low" },
+  { key: "fcMax", label: "Chlorine, high" },
+  { key: "brMin", label: "Bromine, low" },
+  { key: "brMax", label: "Bromine, high" },
+  { key: "chMin", label: "Calcium, low" },
+  { key: "chMax", label: "Calcium, high" },
+  { key: "cyaMin", label: "Stabiliser, low" },
+  { key: "cyaMax", label: "Stabiliser, high" },
 ];
 
 const constantFields: { key: keyof DosingConstants; label: string }[] = [
-  { key: "taIncreaserGPer1000LPer10Ppm", label: "Alkalinity up g/1000L per 10ppm" },
-  { key: "phIncreaserDoseSmallG", label: "pH up — small dose (g/1000L)" },
-  { key: "phIncreaserDoseMediumG", label: "pH up — medium (g/1000L)" },
-  { key: "phIncreaserDoseLargeG", label: "pH up — large (g/1000L)" },
-  { key: "phDecreaserDoseSmallG", label: "pH down — small (g/1000L)" },
-  { key: "phDecreaserDoseMediumG", label: "pH down — medium (g/1000L)" },
-  { key: "phDecreaserDoseLargeG", label: "pH down — large (g/1000L)" },
-  { key: "dichlorAvailableChlorineFraction", label: "Dichlor available-chlorine (0–1)" },
-  { key: "bromineTopUpGPer1000L", label: "Bromine top-up (g/1000L)" },
-  { key: "bromineInitialChargeGPer1000L", label: "Bromine fresh-fill (g/1000L)" },
-  { key: "sodiumBromideGPer1000L", label: "Sodium bromide (g/1000L)" },
-  { key: "mpsShockGPer1000L", label: "Shock / MPS (g/1000L)" },
+  { key: "taIncreaserGPer1000LPer10Ppm", label: "Alkalinity up, g per 1,000 L per 10 ppm" },
+  { key: "phIncreaserDoseSmallG", label: "pH up, small (g per 1,000 L)" },
+  { key: "phIncreaserDoseMediumG", label: "pH up, medium" },
+  { key: "phIncreaserDoseLargeG", label: "pH up, large" },
+  { key: "phDecreaserDoseSmallG", label: "pH down, small (g per 1,000 L)" },
+  { key: "phDecreaserDoseMediumG", label: "pH down, medium" },
+  { key: "phDecreaserDoseLargeG", label: "pH down, large" },
+  { key: "dichlorAvailableChlorineFraction", label: "Dichlor strength (0–1)" },
+  { key: "bromineTopUpGPer1000L", label: "Bromine top-up (g per 1,000 L)" },
+  { key: "bromineInitialChargeGPer1000L", label: "Bromine fresh fill (g per 1,000 L)" },
+  { key: "sodiumBromideGPer1000L", label: "Sodium bromide (g per 1,000 L)" },
+  { key: "mpsShockGPer1000L", label: "Shock / MPS (g per 1,000 L)" },
 ];
 
-export default function SettingsForm({ settings, icsUrl }: Props) {
+interface Values {
+  sanitizerType: SanitizerType;
+  sanitizerUnit: SanitizerUnit;
+  volumeLitres: number;
+  avgDailyBathers: number;
+  targetRanges: TargetRanges;
+  dosingConstants: DosingConstants;
+}
+
+type Panel =
+  | "volume"
+  | "sanitiser"
+  | "measure"
+  | "people"
+  | "location"
+  | "calendar"
+  | "ranges"
+  | "dosing"
+  | "calibration";
+
+const TITLES: Record<Panel, string> = {
+  volume: "Water volume",
+  sanitiser: "Sanitiser",
+  measure: "How you measure",
+  people: "People per day",
+  location: "Location",
+  calendar: "Phone calendar",
+  ranges: "Target ranges",
+  dosing: "Dosing strengths",
+  calibration: "Calibration",
+};
+
+function SetRow({ label, value, onClick }: { label: string; value: string; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex min-h-[56px] w-full items-center gap-3 px-3.5 py-3 text-left hover:bg-surface-2 [&+&]:border-t [&+&]:border-line"
+    >
+      <span className="min-w-0 flex-1 font-bold">{label}</span>
+      <span className="min-w-0 max-w-[50%] truncate text-right text-ink-2">{value}</span>
+      <Icon name="chevron" size={16} className="shrink-0 -rotate-90 text-ink-3" />
+    </button>
+  );
+}
+
+function Option({
+  selected,
+  icon,
+  title,
+  sub,
+  onClick,
+}: {
+  selected: boolean;
+  icon: IconName;
+  title: string;
+  sub?: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      role="radio"
+      aria-checked={selected}
+      onClick={onClick}
+      className="flex min-h-[60px] w-full items-center gap-3 px-3.5 py-3 text-left [&+&]:border-t [&+&]:border-line"
+    >
+      <span className="grid h-10 w-10 shrink-0 place-items-center rounded-[10px] bg-accent-soft text-accent-ink">
+        <Icon name={icon} size={20} />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block font-bold">{title}</span>
+        {sub ? <span className="block text-[13.5px] text-ink-2">{sub}</span> : null}
+      </span>
+      <span
+        className={`grid h-6 w-6 shrink-0 place-items-center rounded-full border-2 ${
+          selected ? "border-accent bg-accent text-on-accent" : "border-ink-3"
+        }`}
+        aria-hidden
+      >
+        {selected ? <Icon name="check" size={14} strokeWidth={3} /> : null}
+      </span>
+    </button>
+  );
+}
+
+function NumberGrid<K extends string>({
+  fields,
+  values,
+  onChange,
+  step,
+}: {
+  fields: { key: K; label: string }[];
+  values: Record<K, number>;
+  onChange: (key: K, v: number) => void;
+  step: string;
+}) {
+  return (
+    <div className="grid grid-cols-2 gap-x-3 gap-y-3.5">
+      {fields.map(({ key, label }) => (
+        <label key={key} className="flex min-w-0 flex-col justify-end">
+          <span className="mb-1 block text-[13px] font-semibold leading-snug text-ink-2">{label}</span>
+          <input
+            type="number"
+            inputMode="decimal"
+            step={step}
+            value={values[key]}
+            onChange={(e) => onChange(key, Number(e.target.value))}
+            className={inputClass}
+          />
+        </label>
+      ))}
+    </div>
+  );
+}
+
+const sameNumbers = <T extends object>(a: T, b: T, skip: (keyof T)[] = []) =>
+  (Object.keys(b) as (keyof T)[]).every((k) => skip.includes(k) || Number(a[k]) === Number(b[k]));
+
+export default function SettingsForm({ settings, icsUrl, suggestions, observationCount }: Props) {
   const router = useRouter();
-  const [sanitizerType, setSanitizerType] = useState(settings.sanitizer_type);
-  const [volume, setVolume] = useState(String(settings.volume_litres));
-  const [bathers, setBathers] = useState(
-    String(settings.avg_daily_bathers ?? 1.5),
-  );
-  const [ranges, setRanges] = useState<TargetRanges>(settings.target_ranges);
-  const [constants, setConstants] = useState<DosingConstants>(
-    settings.dosing_constants,
-  );
-  const [location, setLocation] = useState(settings.location_name ?? "");
-  const [sanitizerUnit, setSanitizerUnit] = useState(
-    settings.sanitizer_unit ?? "ppm",
-  );
-  const [status, setStatus] = useState<"idle" | "saving" | "saved" | "error">(
-    "idle",
-  );
-  const [locationNote, setLocationNote] = useState<string | null>(null);
+  const toast = useToast();
+  const [saved, setSaved] = useState<Values>({
+    sanitizerType: settings.sanitizer_type,
+    sanitizerUnit: settings.sanitizer_unit ?? "ppm",
+    volumeLitres: Number(settings.volume_litres),
+    avgDailyBathers: Number(settings.avg_daily_bathers ?? 1.5),
+    targetRanges: settings.target_ranges,
+    dosingConstants: settings.dosing_constants,
+  });
+  const [panel, setPanel] = useState<Panel | null>(null);
+  const [draft, setDraft] = useState<Values>(saved);
+  const [place, setPlace] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [note, setNote] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
+  function open(p: Panel) {
+    setDraft(saved);
+    setPlace(settings.location_name ?? "");
+    setNote(null);
+    setPanel(p);
+  }
+
   async function save() {
-    setStatus("saving");
-    setLocationNote(null);
+    setSaving(true);
+    setNote(null);
     const res = await fetch("/api/settings", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        sanitizerType,
-        sanitizerUnit,
-        volumeLitres: Number(volume),
-        avgDailyBathers: Number(bathers),
-        targetRanges: ranges,
-        dosingConstants: constants,
-        locationQuery: location,
+        ...draft,
+        // Only look a place up when that's what was being changed.
+        ...(panel === "location" ? { locationQuery: place } : {}),
       }),
-    });
-    if (res.ok) {
-      const data = await res.json().catch(() => ({}));
-      if (data.geocodeFailed) {
-        setLocationNote(
-          "Couldn't find that place — try a town or postcode (everything else saved).",
-        );
-      }
-      setStatus("saved");
-      router.refresh();
-      setTimeout(() => setStatus("idle"), 2000);
-    } else {
-      setStatus("error");
+    }).catch(() => null);
+    setSaving(false);
+    if (!res?.ok) {
+      setNote("That didn't save. Check your connection and try again.");
+      return;
     }
+    const data = await res.json().catch(() => ({}));
+    if (panel === "location" && data.geocodeFailed) {
+      setNote("Couldn't find that place. Try a town or a postcode.");
+      return;
+    }
+    setSaved(draft);
+    setPanel(null);
+    toast("Saved");
+    router.refresh();
   }
 
-  return (
-    <div className="space-y-4">
-      {/* Sanitizer */}
-      <Card>
-        <h2 className="mb-3 font-semibold text-slate-800">Sanitizer</h2>
-        <div className="grid grid-cols-2 gap-2">
-          {(["chlorine", "bromine"] as const).map((type) => (
-            <button
-              key={type}
-              onClick={() => setSanitizerType(type)}
-              className={`rounded-xl border-2 p-3 text-center font-medium capitalize transition ${
-                sanitizerType === type
-                  ? "border-brand-500 bg-brand-50 text-brand-700"
-                  : "border-slate-200 text-slate-500"
-              }`}
-            >
-              <span className="flex items-center justify-center gap-1.5">
-                <Icon name={type === "chlorine" ? "droplet" : "bromine"} size={18} />
-                {type === "chlorine" ? "Chlorine" : "Bromine"}
-              </span>
-            </button>
-          ))}
-        </div>
-      </Card>
+  const set = <K extends keyof Values>(k: K, v: Values[K]) => setDraft((d) => ({ ...d, [k]: v }));
+  const fmtL = (n: number) => `${n.toLocaleString("en-GB")} L`;
+  const change = computeWaterChangeIntervalDays(draft.volumeLitres, draft.avgDailyBathers);
+  const rangesStandard = sameNumbers(saved.targetRanges, DEFAULT_TARGET_RANGES, ["tempTarget"]);
+  const dosingStandard = sameNumbers(saved.dosingConstants, DEFAULT_DOSING_CONSTANTS);
+  const editable = panel !== null && panel !== "calendar" && panel !== "calibration";
 
-      {/* How the sanitiser is measured */}
-      <Card>
-        <h2 className="mb-1 font-semibold text-slate-800">
-          How do you measure it?
-        </h2>
-        <p className="mb-3 text-sm text-slate-500">
-          Test strips read the <strong>amount</strong> of sanitiser. A probe
-          (like an iopool) reads <strong>ORP</strong> — how hard the water is
-          actually sanitising, which is the better measure of whether it&apos;s
-          working.
-        </p>
-        <div className="grid grid-cols-2 gap-2">
-          {(
-            [
-              { key: "ppm", label: "Test strips", sub: "ppm" },
-              { key: "orp", label: "Probe", sub: "ORP / mV" },
-            ] as const
-          ).map((opt) => (
-            <button
-              key={opt.key}
-              onClick={() => setSanitizerUnit(opt.key)}
-              className={`rounded-xl border-2 p-3 text-center transition ${
-                sanitizerUnit === opt.key
-                  ? "border-brand-500 bg-brand-50 text-brand-700"
-                  : "border-slate-200 text-slate-500"
-              }`}
-            >
-              <span className="flex items-center justify-center gap-1.5 font-medium">
-                <Icon name={opt.key === "ppm" ? "flask" : "bolt"} size={18} />
-                {opt.label}
-              </span>
-              <span className="mt-0.5 block text-xs opacity-70">{opt.sub}</span>
-            </button>
-          ))}
-        </div>
-        {sanitizerUnit === "orp" ? (
-          <p className="mt-3 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600">
-            ORP and ppm can&apos;t be converted into each other — the same ppm
-            reads different mV depending on pH, stabiliser and temperature. So
-            in ORP mode I&apos;ll tell you whether your sanitiser is working and
-            guide you to top up gradually, rather than inventing an exact gram
-            figure. Enter a ppm too whenever you have one and you&apos;ll get
-            exact doses back.
-          </p>
-        ) : null}
-      </Card>
-
-      {/* Volume */}
-      <Card>
-        <Field
-          label="Water volume (litres)"
-          hint="A Lay-Z-Spa San Francisco holds about 1050 L when filled to the line."
-        >
-          <input
-            type="number"
-            inputMode="decimal"
-            value={volume}
-            onChange={(e) => setVolume(e.target.value)}
-            className={inputClass}
-          />
-        </Field>
-      </Card>
-
-      {/* Usage / water changes */}
-      <Card>
-        <Field
-          label="People per day (on average)"
-          hint="Used to work out how often to drain & refill. Even light use counts — half a person a day is fine to enter as 0.5."
-        >
-          <input
-            type="number"
-            inputMode="decimal"
-            step="0.5"
-            min={0}
-            value={bathers}
-            onChange={(e) => setBathers(e.target.value)}
-            className={inputClass}
-          />
-        </Field>
-        <WaterChangeHint volume={Number(volume)} bathers={Number(bathers)} />
-      </Card>
-
-      {/* Weather location */}
-      <Card>
-        <Field
-          label="Your location (for weather warnings)"
-          hint="A town or postcode is enough. Used only to warn you about frost or hot spells — leave blank to turn weather off."
-        >
+  let body: ReactNode = null;
+  switch (panel) {
+    case "volume":
+      body = (
+        <>
+          <Card flush>
+            <div className="flex min-h-[68px] items-center justify-between gap-3 px-3.5 py-2.5">
+              <p className="min-w-0 font-bold">Litres</p>
+              <Stepper id="set-volume" label="litres" value={draft.volumeLitres} onChange={(v) => v !== null && set("volumeLitres", v)} step={10} min={100} max={5000} unit="L" />
+            </div>
+          </Card>
+          <p className="text-[14.5px] text-ink-2">Filled to the line, not the brim. Every dose is worked out from this, so it&apos;s worth getting right.</p>
+        </>
+      );
+      break;
+    case "sanitiser":
+      body = (
+        <Card flush>
+          <div role="radiogroup" aria-label="Sanitiser">
+            <Option selected={draft.sanitizerType === "chlorine"} icon="droplet" title="Chlorine" sub="Dichlor granules" onClick={() => set("sanitizerType", "chlorine")} />
+            <Option selected={draft.sanitizerType === "bromine"} icon="bromine" title="Bromine" sub="Tablets or granules" onClick={() => set("sanitizerType", "bromine")} />
+          </div>
+        </Card>
+      );
+      break;
+    case "measure":
+      body = (
+        <>
+          <Card flush>
+            <div role="radiogroup" aria-label="How you measure">
+              <Option selected={draft.sanitizerUnit === "ppm"} icon="flask" title="Test strips" sub="How much sanitiser, in ppm" onClick={() => set("sanitizerUnit", "ppm")} />
+              <Option selected={draft.sanitizerUnit === "orp"} icon="bolt" title="A probe" sub="How hard it's working, as ORP in mV" onClick={() => set("sanitizerUnit", "orp")} />
+            </div>
+          </Card>
+          {draft.sanitizerUnit === "orp" ? (
+            <p className="text-[14.5px] leading-relaxed text-ink-2">
+              ORP and ppm can&apos;t be converted into each other: the same ppm reads differently
+              with pH, stabiliser and temperature. So with a probe you&apos;re told whether the
+              sanitiser is working and to top up a little at a time. Add a strip&apos;s ppm to a
+              test whenever you have one and you&apos;ll get exact grams.
+            </p>
+          ) : null}
+        </>
+      );
+      break;
+    case "people":
+      body = (
+        <>
+          <Card flush>
+            <div className="flex min-h-[68px] items-center justify-between gap-3 px-3.5 py-2.5">
+              <p className="min-w-0 font-bold">On average</p>
+              <Stepper id="set-people" label="people per day" value={draft.avgDailyBathers} onChange={(v) => v !== null && set("avgDailyBathers", v)} step={0.5} min={0} max={20} decimals={1} />
+            </div>
+          </Card>
+          <Callout tone="accent" icon="droplet">
+            That means changing the water about every <strong>{change.intervalDays} days</strong>
+            {change.cappedByMax ? " (light use, so quarterly is plenty)" : ""}. Half a person a day is fine to enter as 0.5.
+          </Callout>
+        </>
+      );
+      break;
+    case "location":
+      body = (
+        <>
           <input
             type="text"
-            value={location}
-            onChange={(e) => setLocation(e.target.value)}
+            value={place}
+            onChange={(e) => setPlace(e.target.value)}
             className={inputClass}
-            placeholder="e.g. Leeds"
+            placeholder="A town or postcode"
+            aria-label="Town or postcode"
+            autoComplete="address-level2"
           />
-        </Field>
-        {locationNote ? (
-          <p className="mt-2 text-sm text-amber-700">{locationNote}</p>
-        ) : settings.location_name ? (
-          <p className="mt-2 text-xs text-slate-400">
-            <Icon name="pin" size={12} className="mr-1 inline align-[-1px]" />
-            Currently: {settings.location_name}
+          <p className="text-[14.5px] text-ink-2">
+            For frost and heat warnings, and the outdoor temperature in the heating plan. Leave it
+            empty to turn weather off.
           </p>
-        ) : null}
-      </Card>
-
-      {/* Advanced: target ranges */}
-      <Card>
-        <details>
-          <summary className="cursor-pointer font-semibold text-slate-800">
-            Advanced: target ranges
-          </summary>
-          <p className="mb-3 mt-2 text-xs text-slate-500">
-            The ideal numbers for your water. Defaults follow common guidance —
-            only change these if your test kit or product says otherwise.
+        </>
+      );
+      break;
+    case "calendar":
+      body = icsUrl ? (
+        <>
+          <p className="text-[14.5px] leading-relaxed text-ink-2">
+            Puts your job dates in your phone&apos;s calendar. Calendar apps refresh on their own
+            slow schedule, so the phone notifications stay the reliable reminder.
           </p>
-          <div className="grid grid-cols-2 gap-3">
-            {rangeFields.map(({ key, label }) => (
-              <label key={key} className="block">
-                <span className="mb-1 block text-xs text-slate-500">{label}</span>
-                <input
-                  type="number"
-                  inputMode="decimal"
-                  step="0.1"
-                  value={ranges[key]}
-                  onChange={(e) =>
-                    setRanges({ ...ranges, [key]: Number(e.target.value) })
-                  }
-                  className="w-full rounded-lg border border-slate-300 px-2 py-1.5 text-sm"
-                />
-              </label>
-            ))}
-          </div>
-        </details>
-      </Card>
-
-      {/* Advanced: dosing constants */}
-      <Card>
-        <details>
-          <summary className="cursor-pointer font-semibold text-slate-800">
-            Advanced: dosing strengths
-          </summary>
-          <p className="mb-3 mt-2 text-xs text-slate-500">
-            How strong each chemical is. If your product label gives different
-            dosing, adjust it here and the calculator follows suit.
-          </p>
-          <div className="grid grid-cols-2 gap-3">
-            {constantFields.map(({ key, label }) => (
-              <label key={key} className="block">
-                <span className="mb-1 block text-xs text-slate-500">{label}</span>
-                <input
-                  type="number"
-                  inputMode="decimal"
-                  step="0.01"
-                  value={constants[key]}
-                  onChange={(e) =>
-                    setConstants({ ...constants, [key]: Number(e.target.value) })
-                  }
-                  className="w-full rounded-lg border border-slate-300 px-2 py-1.5 text-sm"
-                />
-              </label>
-            ))}
-          </div>
-        </details>
-      </Card>
-
-      <Button onClick={save} disabled={status === "saving"} className="w-full">
-        {status === "saving"
-          ? "Saving…"
-          : status === "saved"
-            ? "✓ Saved"
-            : "Save settings"}
-      </Button>
-      {status === "error" ? (
-        <p className="text-center text-sm text-red-600">
-          Could not save. Please try again.
-        </p>
-      ) : null}
-
-      {/* Calendar subscription */}
-      <Card>
-        <h2 className="mb-2 font-semibold text-slate-800">
-          Add to your phone&apos;s calendar (optional)
-        </h2>
-        {icsUrl ? (
-          <>
-            <p className="mb-3 text-sm text-slate-600">
-              Adds your maintenance dates to the calendar app on your phone or
-              computer. (Calendar apps refresh on their own slow schedule, so
-              treat this as a bonus — the phone notifications are the reliable
-              reminder.)
-            </p>
-
-            {/* The one-tap route. A plain https link just downloads a file;
-                webcal:// is what actually opens the "subscribe" flow. */}
-            <a
-              href={icsUrl.replace(/^https?:\/\//, "webcal://")}
-              className="mb-3 flex w-full items-center justify-center gap-2 rounded-xl bg-brand-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-brand-700"
-            >
-              <Icon name="calendar" size={18} />
-              Add to my calendar
-            </a>
-
-            <p className="mb-1.5 text-xs font-medium text-slate-500">
-              Didn&apos;t work, or using Google Calendar on a computer? Copy this
-              link and use <em>Subscribe from URL</em>:
+          {/* A plain https link just downloads a file; webcal:// opens "subscribe". */}
+          <a
+            href={icsUrl.replace(/^https?:\/\//, "webcal://")}
+            className="inline-flex min-h-[52px] w-full items-center justify-center gap-2 rounded-ctl bg-accent px-5 py-3 font-bold text-on-accent"
+          >
+            <Icon name="calendar" size={20} />
+            Add to my calendar
+          </a>
+          <div>
+            <p className="mb-1.5 text-[13.5px] font-semibold text-ink-2">
+              Didn&apos;t work, or using Google Calendar on a computer? Copy the link and use
+              &ldquo;Subscribe from URL&rdquo;:
             </p>
             <div className="flex items-center gap-2">
-              <input
-                readOnly
-                value={icsUrl}
-                className="w-full truncate rounded-lg border border-slate-300 bg-slate-50 px-2 py-1.5 text-xs text-slate-600"
-              />
-              <button
+              <input readOnly value={icsUrl} aria-label="Calendar link" className={`${inputClass} min-w-0 truncate text-sm`} />
+              <Button
+                variant="line"
                 onClick={() => {
                   navigator.clipboard.writeText(icsUrl);
                   setCopied(true);
                   setTimeout(() => setCopied(false), 1500);
                 }}
-                className="shrink-0 rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-semibold text-white"
               >
-                {copied ? "Copied!" : "Copy"}
-              </button>
+                {copied ? "Copied" : "Copy"}
+              </Button>
             </div>
-            <details className="mt-3 text-xs text-slate-500">
-              <summary className="cursor-pointer font-medium text-brand-600">
-                Step-by-step for each calendar app
-              </summary>
-              <ul className="mt-2 space-y-1.5 pl-4">
-                <li className="list-disc">
-                  <strong>iPhone / iPad:</strong> tap <em>Add to my calendar</em>{" "}
-                  above, then <em>Subscribe</em> when Calendar opens.
-                </li>
-                <li className="list-disc">
-                  <strong>Android:</strong> the button works if you have a
-                  calendar app that handles subscriptions. Otherwise use the
-                  Google Calendar route below on a computer — Google doesn&apos;t
-                  let you add a subscription from the phone app.
-                </li>
-                <li className="list-disc">
-                  <strong>Google Calendar (computer):</strong> copy the link,
-                  then in Google Calendar go to <em>Other calendars</em> →{" "}
-                  <strong>+</strong> → <em>From URL</em> and paste it.
-                </li>
-                <li className="list-disc">
-                  <strong>Outlook:</strong> <em>Add calendar</em> →{" "}
-                  <em>Subscribe from web</em> and paste the link.
-                </li>
-              </ul>
-            </details>
+          </div>
+          <ul className="grid gap-1.5 text-[13.5px] leading-snug text-ink-2">
+            <li><strong className="text-ink">iPhone:</strong> tap Add to my calendar, then Subscribe.</li>
+            <li><strong className="text-ink">Android:</strong> the button works with a calendar app that takes subscriptions. Otherwise use Google Calendar on a computer.</li>
+            <li><strong className="text-ink">Google Calendar:</strong> Other calendars, then +, then From URL, and paste.</li>
+            <li><strong className="text-ink">Outlook:</strong> Add calendar, then Subscribe from web, and paste.</li>
+          </ul>
+          <p className="text-[13px] text-ink-3">Keep the link private: anyone with it can see your schedule.</p>
+        </>
+      ) : (
+        <p className="text-[14.5px] text-ink-2">
+          Not switched on. It needs an <code>ICS_FEED_TOKEN</code> in the Vercel project&apos;s
+          environment variables (see the README).
+        </p>
+      );
+      break;
+    case "ranges":
+      body = (
+        <>
+          <p className="text-[14.5px] text-ink-2">The numbers to aim for. Only change these if your test kit or product says otherwise.</p>
+          <NumberGrid fields={rangeFields} values={draft.targetRanges as unknown as Record<keyof TargetRanges, number>} step="0.1" onChange={(k, v) => set("targetRanges", { ...draft.targetRanges, [k]: v })} />
+          <Button variant="text" className="justify-self-start" onClick={() => set("targetRanges", { ...DEFAULT_TARGET_RANGES, tempTarget: draft.targetRanges.tempTarget })}>
+            Back to standard
+          </Button>
+        </>
+      );
+      break;
+    case "dosing":
+      body = (
+        <>
+          <p className="text-[14.5px] text-ink-2">How strong each product is. If your label doses differently, change it here and the calculator follows.</p>
+          <NumberGrid fields={constantFields} values={draft.dosingConstants as unknown as Record<keyof DosingConstants, number>} step="0.01" onChange={(k, v) => set("dosingConstants", { ...draft.dosingConstants, [k]: v })} />
+          <Button variant="text" className="justify-self-start" onClick={() => set("dosingConstants", DEFAULT_DOSING_CONSTANTS)}>
+            Back to standard
+          </Button>
+        </>
+      );
+      break;
+    case "calibration":
+      body = <CalibrationCard suggestions={suggestions} observationCount={observationCount} />;
+      break;
+  }
 
-            <p className="mt-3 text-xs text-slate-400">
-              Keep this link private — anyone with it can see your schedule.
-            </p>
-          </>
-        ) : (
-          <p className="text-sm text-slate-500">
-            Set the <code>ICS_FEED_TOKEN</code> environment variable in Vercel to
-            enable the calendar subscription link.
-          </p>
-        )}
-      </Card>
-
-      {/* Links */}
-      <Card>
-        <Link
-          href="/history"
-          className="flex items-center justify-between font-medium text-slate-700"
-        >
-          <span className="flex items-center gap-2.5">
-            <Icon name="scroll" size={20} className="text-brand-600" />
-            View history (readings &amp; doses)
-          </span>
-          <span className="text-brand-600">→</span>
-        </Link>
-      </Card>
-      <Card>
-        <Link
-          href="/guides"
-          className="flex items-center justify-between font-medium text-slate-700"
-        >
-          <span className="flex items-center gap-2.5">
-            <Icon name="clipboard" size={20} className="text-brand-600" />
-            Guides &amp; help
-          </span>
-          <span className="text-brand-600">→</span>
-        </Link>
-      </Card>
-      <Card>
-        <Link
-          href="/setup"
-          className="flex items-center justify-between font-medium text-slate-700"
-        >
-          <span className="flex items-center gap-2.5">
-            <Icon name="shower" size={20} className="text-brand-600" />
-            Fresh water setup (guided)
-          </span>
-          <span className="text-brand-600">→</span>
-        </Link>
-      </Card>
-    </div>
-  );
-}
-
-// Live "you should change the water roughly every N days" hint. Recomputes as
-// the volume or bathers inputs change (uses the same pure formula as the app).
-function WaterChangeHint({
-  volume,
-  bathers,
-}: {
-  volume: number;
-  bathers: number;
-}) {
-  if (!Number.isFinite(volume) || volume <= 0) return null;
-  const { intervalDays, cappedByMax } = computeWaterChangeIntervalDays(
-    volume,
-    bathers,
-  );
   return (
-    <p className="mt-2 rounded-lg bg-brand-50 px-3 py-2 text-sm text-brand-800">
-      <Icon name="droplet" size={14} className="mr-1 inline align-[-2px]" />
-      Suggested drain &amp; refill: about every{" "}
-      <strong>{intervalDays} days</strong>
-      {cappedByMax ? " (light use — quarterly is plenty)" : ""}. You can apply
-      this to your schedule from the <strong>Today</strong> screen.
-    </p>
+    <>
+      <Section title="Your tub">
+        <Card flush>
+          <SetRow label="Water volume" value={fmtL(saved.volumeLitres)} onClick={() => open("volume")} />
+          <SetRow label="Sanitiser" value={saved.sanitizerType === "chlorine" ? "Chlorine" : "Bromine"} onClick={() => open("sanitiser")} />
+          <SetRow label="How you measure" value={saved.sanitizerUnit === "orp" ? "Probe (ORP)" : "Test strips"} onClick={() => open("measure")} />
+          <SetRow label="People per day" value={String(saved.avgDailyBathers)} onClick={() => open("people")} />
+        </Card>
+      </Section>
+
+      <Section title="Heating">
+        <Card flush>
+          <Row title="Soak temperature and times" sub={`${saved.targetRanges.tempTarget}°C, on the Heat tab`} href="/heat" />
+        </Card>
+      </Section>
+
+      <Section title="Reminders">
+        <Card flush>
+          <SetRow label="Location" value={settings.location_name || "Not set"} onClick={() => open("location")} />
+          <SetRow label="Phone calendar" value={icsUrl ? "Add" : "Off"} onClick={() => open("calendar")} />
+        </Card>
+      </Section>
+
+      <Section title="Fine-tuning">
+        <Card flush>
+          <SetRow label="Target ranges" value={rangesStandard ? "Standard" : "Custom"} onClick={() => open("ranges")} />
+          <SetRow label="Dosing strengths" value={dosingStandard ? "Standard" : "Custom"} onClick={() => open("dosing")} />
+          <SetRow
+            label="Calibration"
+            value={suggestions.length ? `${suggestions.length} to review` : `${observationCount} dose${observationCount === 1 ? "" : "s"} learned`}
+            onClick={() => open("calibration")}
+          />
+        </Card>
+      </Section>
+
+      <Section title="More">
+        <Card flush>
+          <Row icon="scroll" title="History" sub="Every test, dose and soak" href="/history" />
+          <Row icon="clipboard" title="Guides" sub="Step by step, saved as you go" href="/guides" />
+          <Row icon="shower" title="Fresh water setup" sub="After a drain and refill" href="/setup" />
+        </Card>
+      </Section>
+
+      <Card flush>
+        <button
+          type="button"
+          onClick={async () => {
+            await fetch("/api/logout", { method: "POST" }).catch(() => null);
+            router.push("/login");
+          }}
+          className="flex min-h-[56px] w-full items-center px-3.5 font-bold text-bad-ink hover:bg-surface-2"
+        >
+          Log out
+        </button>
+      </Card>
+
+      <Sheet open={panel !== null} onClose={() => setPanel(null)} title={panel ? TITLES[panel] : ""}>
+        {body}
+        {note ? (
+          <Callout tone="warn" icon="alert-triangle">
+            {note}
+          </Callout>
+        ) : null}
+        {editable ? (
+          <Button block size="lg" disabled={saving} onClick={save}>
+            {saving ? "Saving…" : "Save"}
+          </Button>
+        ) : (
+          <Button block variant="quiet" onClick={() => setPanel(null)}>
+            Done
+          </Button>
+        )}
+      </Sheet>
+    </>
   );
 }

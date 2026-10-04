@@ -1,17 +1,21 @@
+// History: every saved test, dose and soak, newest first. Reached from Water.
 import SetupNeeded from "@/components/SetupNeeded";
+import PageHeader from "@/components/PageHeader";
 import DeleteReadingButton from "@/components/DeleteReadingButton";
-import { Card } from "@/components/ui";
-import Icon from "@/components/Icon";
-import {
-  getRecentReadings,
-  getRecentDosing,
-  getSettings,
-  getRecentUsage,
-} from "@/lib/data";
+import { Card, Row, Section } from "@/components/ui";
+import { getRecentReadings, getRecentDosing, getSettings, getRecentUsage } from "@/lib/data";
 import { CHEMICAL_LABELS, type UsageLogRow } from "@/lib/types";
 import { formatDateTime } from "@/lib/display";
 
 export const dynamic = "force-dynamic";
+
+function Empty({ children }: { children: React.ReactNode }) {
+  return (
+    <Card>
+      <p className="text-[14.5px] text-ink-2">{children}</p>
+    </Card>
+  );
+}
 
 export default async function HistoryPage() {
   let readings, dosing, settings;
@@ -22,12 +26,10 @@ export default async function HistoryPage() {
       getSettings(),
     ]);
   } catch (err) {
-    return (
-      <SetupNeeded message={err instanceof Error ? err.message : "Unknown error"} />
-    );
+    return <SetupNeeded message={err instanceof Error ? err.message : "Unknown error"} />;
   }
 
-  // Usage is optional (its table may not exist yet) — never break the page.
+  // Usage is optional (its table may not exist yet), so never break the page.
   let usage: UsageLogRow[] = [];
   try {
     usage = await getRecentUsage(50);
@@ -38,108 +40,76 @@ export default async function HistoryPage() {
   const isChlorine = settings.sanitizer_type === "chlorine";
 
   return (
-    <div className="space-y-4">
-      <div>
-        <h1 className="text-2xl font-bold text-slate-800">History</h1>
-        <p className="text-sm text-slate-500">Your past readings and doses.</p>
-      </div>
+    <div className="grid gap-[18px]">
+      <PageHeader title="History" subtitle="Tests, doses and soaks" back={{ href: "/water", label: "Back to Water" }} />
 
-      <section>
-        <h2 className="mb-2 font-semibold text-slate-700">Test readings</h2>
+      <Section title="Tests" aside={readings.length ? `${readings.length}` : undefined}>
         {readings.length === 0 ? (
-          <Card>
-            <p className="text-sm text-slate-500">No readings logged yet.</p>
-          </Card>
+          <Empty>No tests saved yet.</Empty>
         ) : (
-          <div className="space-y-2">
-            {readings.map((r) => (
-              <Card key={r.id}>
-                <div className="flex items-start justify-between">
-                  <div>
-                    <p className="text-xs text-slate-400">
+          <Card flush>
+            {readings.map((r) => {
+              const san = isChlorine ? r.free_chlorine_ppm : r.bromine_ppm;
+              const parts = [
+                `pH ${r.ph}`,
+                `Alk ${r.total_alkalinity_ppm}`,
+                san !== null ? `${isChlorine ? "Cl" : "Br"} ${san}` : null,
+                r.orp_mv !== null ? `${r.orp_mv} mV` : null,
+                r.calcium_hardness_ppm !== null ? `Ca ${r.calcium_hardness_ppm}` : null,
+              ].filter(Boolean);
+              return (
+                <Row
+                  key={r.id}
+                  title={<span className="tabular-nums">{parts.join(" · ")}</span>}
+                  sub={
+                    <>
                       {formatDateTime(r.recorded_at)}
                       {r.is_fresh_fill ? " · fresh fill" : ""}
-                    </p>
-                    <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-sm text-slate-700">
-                      <span>pH {r.ph}</span>
-                      <span>TA {r.total_alkalinity_ppm}</span>
-                      <span>
-                        {isChlorine ? "Cl" : "Br"}{" "}
-                        {isChlorine
-                          ? r.free_chlorine_ppm ?? "—"
-                          : r.bromine_ppm ?? "—"}
-                      </span>
-                      {r.calcium_hardness_ppm !== null ? (
-                        <span>CH {r.calcium_hardness_ppm}</span>
-                      ) : null}
-                    </div>
-                    {r.notes ? (
-                      <p className="mt-1 text-xs italic text-slate-500">
-                        {r.notes}
-                      </p>
-                    ) : null}
-                  </div>
-                  <DeleteReadingButton readingId={r.id} />
-                </div>
-              </Card>
-            ))}
-          </div>
-        )}
-      </section>
-
-      <section>
-        <h2 className="mb-2 font-semibold text-slate-700">Chemicals added</h2>
-        {dosing.length === 0 ? (
-          <Card>
-            <p className="text-sm text-slate-500">
-              No doses logged yet. When you add a chemical, tap “Log this as
-              added” to keep a record.
-            </p>
+                      {r.notes ? <span className="block italic">{r.notes}</span> : null}
+                    </>
+                  }
+                  right={<DeleteReadingButton readingId={r.id} />}
+                />
+              );
+            })}
           </Card>
-        ) : (
-          <div className="space-y-2">
-            {dosing.map((d) => (
-              <Card key={d.id}>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-slate-800">
-                      {CHEMICAL_LABELS[d.chemical]} — {d.amount_grams} g
-                    </p>
-                    <p className="text-xs text-slate-400">
-                      {formatDateTime(d.logged_at)}
-                    </p>
-                    {d.note ? (
-                      <p className="mt-0.5 text-xs italic text-slate-500">
-                        {d.note}
-                      </p>
-                    ) : null}
-                  </div>
-                </div>
-              </Card>
-            ))}
-          </div>
         )}
-      </section>
+      </Section>
+
+      <Section title="Chemicals added" aside={dosing.length ? `${dosing.length}` : undefined}>
+        {dosing.length === 0 ? (
+          <Empty>No doses logged yet. After a test, tap &ldquo;I&apos;ve added it&rdquo; to keep a record.</Empty>
+        ) : (
+          <Card flush>
+            {dosing.map((d) => (
+              <Row
+                key={d.id}
+                title={`${CHEMICAL_LABELS[d.chemical]} · ${d.amount_grams} g`}
+                sub={
+                  <>
+                    {formatDateTime(d.logged_at)}
+                    {d.note ? <span className="block italic">{d.note}</span> : null}
+                  </>
+                }
+              />
+            ))}
+          </Card>
+        )}
+      </Section>
 
       {usage.length > 0 ? (
-        <section>
-          <h2 className="mb-2 font-semibold text-slate-700">Recent soaks</h2>
-          <div className="space-y-2">
+        <Section title="Soaks" aside={`${usage.length}`}>
+          <Card flush>
             {usage.map((u) => (
-              <Card key={u.id}>
-                <div className="flex items-center justify-between">
-                  <p className="text-sm font-medium text-slate-800">
-                    <Icon name="bath" size={14} className="mr-1 inline align-[-2px]" />
-                    {u.bathers} {u.bathers === 1 ? "person" : "people"}
-                  </p>
-                  <p className="text-xs text-slate-400">
-                    {formatDateTime(u.used_at)}
-                  </p>
-                </div>
-              </Card>
+              <Row
+                key={u.id}
+                icon="bath"
+                title={`${u.bathers} ${u.bathers === 1 ? "person" : "people"}`}
+                sub={formatDateTime(u.used_at)}
+              />
             ))}
-          </div>
-        </section>
+          </Card>
+        </Section>
       ) : null}
     </div>
   );

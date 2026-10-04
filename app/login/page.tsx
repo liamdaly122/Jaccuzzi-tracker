@@ -2,7 +2,7 @@
 
 import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Button, Field, inputClass } from "@/components/ui";
+import { Button, Callout, Field, inputClass } from "@/components/ui";
 import Icon from "@/components/Icon";
 
 function LoginForm() {
@@ -29,32 +29,27 @@ function LoginForm() {
         router.refresh();
       } else {
         const data = await res.json().catch(() => ({}));
-        setError(data.error || "Incorrect passcode");
+        setError(data.error || "That passcode isn't right.");
         setLoading(false);
       }
     } catch {
-      setError("Something went wrong. Please try again.");
+      setError("Couldn't check that. Check your connection and try again.");
       setLoading(false);
     }
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-b from-brand-50 to-slate-100 p-6">
-      <div className="w-full max-w-sm">
+    <main className="grid min-h-screen place-items-center px-4 py-10">
+      <div className="w-full max-w-[380px]">
         <div className="mb-6 text-center">
-          <div className="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-2xl bg-brand-600 text-3xl">
-            <Icon name="bath" size={34} className="text-brand-600" />
+          <div className="mx-auto mb-3.5 grid h-16 w-16 place-items-center rounded-[18px] bg-accent text-on-accent">
+            <Icon name="bath" size={34} />
           </div>
-          <h1 className="text-2xl font-bold text-slate-800">Hot Tub Tracker</h1>
-          <p className="mt-1 text-sm text-slate-500">
-            Enter your passcode to continue.
-          </p>
+          <h1 className="text-[28px] font-extrabold tracking-tight">Hot Tub Tracker</h1>
+          <p className="mt-1 text-[15px] text-ink-2">Enter your passcode to carry on.</p>
         </div>
 
-        <form
-          onSubmit={onSubmit}
-          className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
-        >
+        <form onSubmit={onSubmit} className="grid gap-3.5 rounded-card border border-line bg-surface p-5">
           <Field label="Passcode">
             <input
               type="password"
@@ -68,21 +63,17 @@ function LoginForm() {
           </Field>
 
           {error ? (
-            <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
+            <Callout tone="bad" icon="alert-triangle">
               {error}
-            </p>
+            </Callout>
           ) : null}
 
-          <Button
-            type="submit"
-            disabled={loading || passcode.length === 0}
-            className="mt-4 w-full"
-          >
+          <Button type="submit" size="lg" block disabled={loading || passcode.length === 0}>
             {loading ? "Checking…" : "Unlock"}
           </Button>
         </form>
       </div>
-    </div>
+    </main>
   );
 }
 
