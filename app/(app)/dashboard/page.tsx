@@ -287,7 +287,6 @@ export default async function DashboardPage() {
           soaksPerWeek: perWeek,
           targetC: soakTargetC,
           ambientC,
-          coolsToC: Math.max(ambientC + 2, 15),
           watts: heater.watts,
           volumeLitres: config.volumeLitres,
           uaWPerK: heatLoss.uaWPerK,

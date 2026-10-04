@@ -13,7 +13,8 @@ import type { HeatLossBasis } from "@/lib/heating";
 import type { KeepWarmComparison } from "@/lib/heating";
 import type { RunningCostSummary, SeasonalComparison } from "@/lib/costs";
 
-const money = (n: number) => `£${n.toFixed(n < 10 ? 2 : 0)}`;
+const money = (n: number) =>
+  n < 1 ? `${Math.round(n * 100)}p` : `£${n.toFixed(n < 10 ? 2 : 0)}`;
 
 const BASIS_NOTE: Record<HeatLossBasis, string> = {
   measured:
@@ -96,13 +97,11 @@ export default function RunningCostsCard({
             <Row label="Leave it hot" value={`${money(keepWarm.keepWarmWeekly)}/wk`} />
             <Row
               label="Let it cool, reheat each time"
-              value={`${money(keepWarm.reheatWeekly)}/wk`}
+              value={`${money(keepWarm.letCoolWeekly)}/wk`}
             />
           </dl>
           <p className="mt-1.5 text-sm font-medium text-slate-800">
-            {keepWarm.cheaper === "keep_warm"
-              ? `Cheaper to leave it at temperature — about ${money(keepWarm.savingWeekly)} a week better than reheating from cold.`
-              : `Cheaper to let it cool between soaks — about ${money(keepWarm.savingWeekly)} a week better than holding it hot.`}
+            {`Letting it cool saves about ${money(keepWarm.savingWeekly)} a week. It only drops to about ${keepWarm.coolsToC}° between soaks, so you'd switch on roughly ${Math.max(1, Math.round(keepWarm.reheatHours * 2) / 2)} h before each one.`}
           </p>
         </div>
       ) : null}

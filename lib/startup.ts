@@ -319,6 +319,10 @@ export function stagePhase(key: StartupStageKey): {
 // isSafeToBathe — the hard gate. Safe only when there's no danger flag AND the
 // active sanitizer is present and within its target band (not too high, not
 // absent). Reuses the app calculator so the rule matches the rest of the app.
+//
+// A strip's ppm figure is the direct measure, so it wins when there is one.
+// Without it, a probe user's ORP decides — otherwise someone measuring only by
+// probe could never finish the setup, however good the water was.
 // -----------------------------------------------------------------------------
 export function isSafeToBathe(
   sanitizer: SanitizerType,
@@ -330,7 +334,14 @@ export function isSafeToBathe(
 
   const level =
     sanitizer === "chlorine" ? reading.freeChlorinePpm : reading.brominePpm;
-  if (level === null || level === undefined) return false;
+  if (level === null || level === undefined) {
+    const mv = reading.orpMv;
+    if (config.sanitizerUnit !== "orp" || mv === null || mv === undefined) {
+      return false;
+    }
+    const { orpMin, orpMax } = config.targetRanges;
+    return mv >= orpMin && mv <= orpMax;
+  }
 
   const { fcMin, fcMax, brMin, brMax } = config.targetRanges;
   const min = sanitizer === "chlorine" ? fcMin : brMin;

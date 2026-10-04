@@ -530,57 +530,77 @@ export function nextSoakTime(
   return fallback;
 }
 
-// --- Hold it hot, or let it go cold? -------------------------------------------
+// --- Hold it hot, or let it cool between soaks? --------------------------------
 //
-// At £8-14 a heat-up this genuinely flips: soak most days and standby wins, soak
-// occasionally and reheating does. Both sides are the same heat-loss physics.
+// Between soaks the water cools exponentially towards the air, with a time
+// constant of thermal mass / heat loss. Holding it at temperature loses heat
+// at the full temperature difference the whole time; letting it cool loses
+// less, because the difference shrinks as it cools. So letting it cool never
+// costs more, and the real question is HOW MUCH it saves, against having to
+// switch on a couple of hours before every soak. With good covers the time
+// constant is measured in days, the water barely cools overnight, and the
+// saving is pennies.
+//
+// The previous version assumed the water fell to ~15 °C between every soak,
+// which for an insulated tub soaked daily overstated reheating a hundredfold
+// and told frequent soakers the opposite of the truth.
 export interface KeepWarmComparison {
   soaksPerWeek: number;
   /** Cost of holding at target for a week. */
   keepWarmWeekly: number;
-  /** Cost of reheating from a cold start for each soak that week. */
-  reheatWeekly: number;
-  cheaper: "keep_warm" | "let_it_cool";
-  /** What choosing the cheaper option saves per week. */
+  /** Cost of letting it cool and reheating before each soak that week. */
+  letCoolWeekly: number;
+  /** What letting it cool saves per week (never negative). */
   savingWeekly: number;
+  /** Where the water gets to between soaks. */
+  coolsToC: number;
+  /** Heat-up needed before each soak if it's left to cool. */
+  reheatHours: number;
 }
 
 export function keepWarmVsReheat(opts: {
   soaksPerWeek: number;
   targetC: number;
   ambientC: number;
-  coolsToC: number;
   watts: number;
   volumeLitres: number;
   uaWPerK: number;
   pricePerKwh?: number;
 }): KeepWarmComparison | null {
-  const {
-    soaksPerWeek,
-    targetC,
-    ambientC,
-    coolsToC,
-    watts,
-    volumeLitres,
-  } = opts;
+  const { soaksPerWeek, targetC, ambientC, watts, volumeLitres } = opts;
   const price = opts.pricePerKwh ?? DEFAULT_ELECTRICITY_PRICE_PER_KWH;
   const ua = opts.uaWPerK;
-  if (soaksPerWeek <= 0) return null;
+  if (soaksPerWeek <= 0 || ua <= 0 || targetC <= ambientC) return null;
+
+  const tauHours = thermalMassKwhPerK(volumeLitres) / (ua / 1000);
+  const gapHours = (7 * 24) / soaksPerWeek;
+  const cooledAfter = (hours: number) =>
+    ambientC + (targetC - ambientC) * Math.exp(-Math.max(0, hours) / tauHours);
+
+  // The heat-up eats into the gap, so cool for what's left of it. One pass is
+  // plenty: the heat-up is short next to the gap for any realistic schedule.
+  let coolsToC = cooledAfter(gapHours);
+  let hours = heatUpHours(coolsToC, targetC, ambientC, watts, volumeLitres, ua);
+  if (hours === null) return null;
+  coolsToC = cooledAfter(gapHours - hours);
+  hours = heatUpHours(coolsToC, targetC, ambientC, watts, volumeLitres, ua);
+  if (hours === null) return null;
 
   const keepWarmWeekly =
     standbyKwhPerDay(targetC, ambientC, volumeLitres, ua) * 7 * price;
-
-  const hours = heatUpHours(coolsToC, targetC, ambientC, watts, volumeLitres, ua);
-  if (hours === null) return null;
-  const reheatWeekly = heatUpKwh(hours, watts) * soaksPerWeek * price;
+  const letCoolWeekly = Math.min(
+    keepWarmWeekly,
+    heatUpKwh(hours, watts) * soaksPerWeek * price,
+  );
 
   const round2 = (n: number) => Math.round(n * 100) / 100;
   return {
     soaksPerWeek: Math.round(soaksPerWeek * 10) / 10,
     keepWarmWeekly: round2(keepWarmWeekly),
-    reheatWeekly: round2(reheatWeekly),
-    cheaper: keepWarmWeekly <= reheatWeekly ? "keep_warm" : "let_it_cool",
-    savingWeekly: round2(Math.abs(keepWarmWeekly - reheatWeekly)),
+    letCoolWeekly: round2(letCoolWeekly),
+    savingWeekly: round2(keepWarmWeekly - letCoolWeekly),
+    coolsToC: Math.round(coolsToC * 10) / 10,
+    reheatHours: Math.round(hours * 100) / 100,
   };
 }
 

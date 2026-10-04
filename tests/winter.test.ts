@@ -241,12 +241,20 @@ describe("hibernationState", () => {
     expect(h.reopen).toEqual(w.reopen);
   });
 
-  it("keeps watching the weather when the tub is still in the garden", () => {
-    for (const key of ["drained_in_place", "freeze_shield"]) {
-      const h = hibernationState("2026-11-01T10:00:00.000Z", key, w);
-      expect(h.hibernating).toBe(true);
-      expect(h.stillOutdoors).toBe(true);
-    }
+  it("keeps watching the weather when a drained tub is still in the garden", () => {
+    const h = hibernationState("2026-11-01T10:00:00.000Z", "drained_in_place", w);
+    expect(h.hibernating).toBe(true);
+    expect(h.stillOutdoors).toBe(true);
+    expect(h.keepingItRunning).toBe(false);
+  });
+
+  it("does not go quiet when the tub is left running on Freeze Shield", () => {
+    // The bug: this used to hibernate, silencing every reminder all winter
+    // while the tub was still full of water that needed looking after.
+    const h = hibernationState("2026-11-01T10:00:00.000Z", "freeze_shield", w);
+    expect(h.hibernating).toBe(false);
+    expect(h.keepingItRunning).toBe(true);
+    expect(h.strategy).toBe("freeze_shield");
   });
 
   it("shrugs off a junk timestamp or an unknown strategy", () => {

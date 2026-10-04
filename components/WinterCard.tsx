@@ -87,6 +87,36 @@ export default function WinterCard({
     );
   }
 
+  // --- Left running on Freeze Shield: a decision, not a shutdown -----------
+  if (hibernation.keepingItRunning) {
+    return (
+      <Card>
+        <h2 className="mb-1 flex items-center gap-2 font-semibold text-slate-800">
+          <Icon name="snowflake" size={18} className="text-brand-600" />
+          Keeping it running this winter
+        </h2>
+        <p className="text-sm text-slate-600">
+          Freeze Shield keeps the water above freezing, so your reminders and
+          the daily check carry on as normal.
+        </p>
+        <p className="mt-2 flex items-start gap-2 rounded-xl bg-amber-50 p-2.5 text-sm text-amber-900">
+          <Icon name="alert-triangle" size={15} className="mt-0.5 shrink-0" />
+          <span>
+            Keep it plugged in with the filter running. A tripped socket during
+            a cold snap is how pumps crack.
+          </span>
+        </p>
+        <div className="mt-3">
+          <WinterButton
+            action="wake"
+            label="Change plan"
+            confirm="This clears your winter plan so you can pick again."
+          />
+        </div>
+      </Card>
+    );
+  }
+
   // Out of season: say nothing at all.
   if (!window || !countdown || countdown.status === "not_yet") return null;
 
@@ -199,6 +229,11 @@ export default function WinterCard({
               <WinterButton
                 action="hibernate"
                 strategy={s.key}
+                confirm={
+                  s.key === "freeze_shield"
+                    ? "Your reminders and the daily check carry on, because the water still needs looking after."
+                    : undefined
+                }
                 label={
                   s.key === "freeze_shield"
                     ? "I'm leaving it running"

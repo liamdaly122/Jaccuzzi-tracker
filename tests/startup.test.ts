@@ -174,6 +174,31 @@ describe("isSafeToBathe", () => {
     ).toBe(false);
   });
 
+  describe("on a probe alone (ORP mode)", () => {
+    const orpConfig: SpaConfig = { ...chlorineConfig, sanitizerUnit: "orp" };
+    const probeOnly = { ph: 7.5, totalAlkalinityPpm: 100, freeChlorinePpm: null };
+
+    it("can pass with ORP in range — it used to be impossible", () => {
+      expect(isSafeToBathe("chlorine", { ...probeOnly, orpMv: 700 }, orpConfig)).toBe(true);
+    });
+
+    it("fails with ORP too low or still too high", () => {
+      expect(isSafeToBathe("chlorine", { ...probeOnly, orpMv: 600 }, orpConfig)).toBe(false);
+      expect(isSafeToBathe("chlorine", { ...probeOnly, orpMv: 800 }, orpConfig)).toBe(false);
+      expect(isSafeToBathe("chlorine", { ...probeOnly, orpMv: null }, orpConfig)).toBe(false);
+    });
+
+    it("lets a strip's ppm figure win when there is one", () => {
+      expect(
+        isSafeToBathe("chlorine", { ...probeOnly, freeChlorinePpm: 1, orpMv: 700 }, orpConfig),
+      ).toBe(false);
+    });
+
+    it("still needs ppm when the tub is set to strips", () => {
+      expect(isSafeToBathe("chlorine", { ...probeOnly, orpMv: 700 }, chlorineConfig)).toBe(false);
+    });
+  });
+
   it("is NOT safe when sanitizer is absent/too low", () => {
     expect(
       isSafeToBathe(

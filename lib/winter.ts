@@ -340,7 +340,10 @@ export function strategy(key: WinterStrategy): StrategyOption {
 // still at risk, so frost warnings survive hibernation while routine nagging
 // doesn't.
 export interface HibernationState {
+  /** Packed away or drained: routine reminders go quiet. */
   hibernating: boolean;
+  /** Chose Freeze Shield: the tub stays full and live, so nothing goes quiet. */
+  keepingItRunning: boolean;
   strategy: WinterStrategy | null;
   since: Date | null;
   /** Still outside, so still worth a frost warning. */
@@ -359,12 +362,18 @@ export function hibernationState(
     ? (winterStrategy as WinterStrategy)
     : null;
 
+  // Freeze Shield isn't hibernation at all: the tub is full, live and can be
+  // used, so its water needs testing and dosing like any other week. Treating
+  // it as hibernation silenced every reminder for the whole winter.
+  const keepingItRunning = valid && key === "freeze_shield";
+  const hibernating = valid && !keepingItRunning;
+
   return {
-    hibernating: valid,
+    hibernating,
+    keepingItRunning,
     strategy: key,
     since: valid ? since : null,
-    // Freeze Shield isn't hibernation at all — the tub is live and in use.
-    stillOutdoors: valid && key !== "pack_down",
+    stillOutdoors: hibernating && key !== "pack_down",
     reopen: window?.reopen ?? null,
   };
 }

@@ -345,31 +345,52 @@ describe("keepWarmVsReheat", () => {
   const base = {
     targetC: 38,
     ambientC: 12,
-    coolsToC: 16,
     watts: P,
     volumeLitres: V,
     uaWPerK: UA,
   };
+  const INSULATED = 4.2; // the user's measured covers
 
-  it("tells an occasional user to let it cool", () => {
-    const r = keepWarmVsReheat({ ...base, soaksPerWeek: 1 })!;
-    expect(r.cheaper).toBe("let_it_cool");
+  it("never finds letting it cool dearer than holding it hot", () => {
+    // Heat leaks in proportion to the temperature gap, and a cooling tub has a
+    // smaller gap than a hot one, so this holds for any tub and any schedule.
+    for (const ua of [UA, INSULATED]) {
+      for (const soaksPerWeek of [1, 2, 3.5, 5, 7, 14]) {
+        const r = keepWarmVsReheat({ ...base, uaWPerK: ua, soaksPerWeek })!;
+        expect(r.letCoolWeekly).toBeLessThanOrEqual(r.keepWarmWeekly);
+        expect(r.savingWeekly).toBeGreaterThanOrEqual(0);
+      }
+    }
+  });
+
+  it("saves only pennies for a well-covered tub used every day", () => {
+    // The bug: it assumed the water dropped to ~15 °C between every soak and
+    // claimed about £60 a week. With the user's covers it barely cools.
+    const r = keepWarmVsReheat({
+      ...base,
+      targetC: 40,
+      ambientC: 10.5,
+      uaWPerK: INSULATED,
+      soaksPerWeek: 7,
+    })!;
+    expect(r.coolsToC).toBeGreaterThan(37);
     expect(r.savingWeekly).toBeGreaterThan(0);
+    expect(r.savingWeekly).toBeLessThan(0.6);
+    expect(r.reheatHours).toBeLessThan(3);
   });
 
-  it("tells a frequent user to leave it hot", () => {
-    const r = keepWarmVsReheat({ ...base, soaksPerWeek: 6 })!;
-    expect(r.cheaper).toBe("keep_warm");
+  it("saves pounds for an uncovered tub used twice a week", () => {
+    const r = keepWarmVsReheat({ ...base, soaksPerWeek: 2 })!;
+    expect(r.savingWeekly).toBeGreaterThan(3);
+    expect(r.coolsToC).toBeLessThan(25);
   });
 
-  it("crosses over somewhere sensible in the middle", () => {
+  it("saves less the more often you get in", () => {
     const two = keepWarmVsReheat({ ...base, soaksPerWeek: 2 })!;
     const five = keepWarmVsReheat({ ...base, soaksPerWeek: 5 })!;
-    expect(two.cheaper).toBe("let_it_cool");
-    expect(five.cheaper).toBe("keep_warm");
-    // Standby doesn't care how often you get in; reheating does.
+    expect(five.savingWeekly).toBeLessThan(two.savingWeekly);
+    // Standby doesn't care how often you get in.
     expect(two.keepWarmWeekly).toBe(five.keepWarmWeekly);
-    expect(five.reheatWeekly).toBeGreaterThan(two.reheatWeekly);
   });
 
   it("costs more to hold when it's colder outside", () => {
@@ -442,7 +463,6 @@ describe("soak temperature", () => {
       soaksPerWeek: 5,
       targetC: 38,
       ambientC: 12,
-      coolsToC: 16,
       watts: P,
       volumeLitres: V,
       uaWPerK: UA,
@@ -451,7 +471,6 @@ describe("soak temperature", () => {
       soaksPerWeek: 5,
       targetC: 40,
       ambientC: 12,
-      coolsToC: 16,
       watts: P,
       volumeLitres: V,
       uaWPerK: UA,

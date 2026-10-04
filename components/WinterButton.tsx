@@ -11,10 +11,13 @@ export default function WinterButton({
   action,
   strategy,
   label,
+  confirm,
 }: {
   action: "hibernate" | "wake";
   strategy?: WinterStrategy;
   label: string;
+  /** Overrides the default confirmation text when the consequence differs. */
+  confirm?: string;
 }) {
   const router = useRouter();
   const [state, setState] = useState<"idle" | "confirming" | "saving">("idle");
@@ -49,9 +52,10 @@ export default function WinterButton({
   return (
     <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
       <p className="text-sm text-slate-700">
-        {action === "hibernate"
+        {confirm ??
+          (action === "hibernate"
           ? "This stops the testing reminders and the daily check until you wake it up again. Frost warnings carry on if the tub is staying outside."
-          : "This starts the reminders and the daily check again. You'll want to run the fresh water setup once it's filled."}
+          : "This starts the reminders and the daily check again. You'll want to run the fresh water setup once it's filled.")}
       </p>
       <div className="mt-2 flex gap-2">
         <Button onClick={submit} disabled={state === "saving"} className="flex-1">
