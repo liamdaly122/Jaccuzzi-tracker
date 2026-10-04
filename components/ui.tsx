@@ -120,25 +120,6 @@ export function Chip({
   );
 }
 
-// Kept for the screens that still use it; maps the old tone names onto Chip.
-type BadgeTone = "green" | "amber" | "red" | "blue" | "slate";
-const badgeToTone: Record<BadgeTone, Tone> = {
-  green: "good",
-  amber: "warn",
-  red: "bad",
-  blue: "accent",
-  slate: "neutral",
-};
-export function Badge({
-  children,
-  tone = "slate",
-}: {
-  children: ReactNode;
-  tone?: BadgeTone;
-}) {
-  return <Chip tone={badgeToTone[tone]}>{children}</Chip>;
-}
-
 // --- Meter ---------------------------------------------------------------------
 
 const meterTones: Record<Tone, string> = {
@@ -248,17 +229,13 @@ export function Row({
 
 // --- Buttons -------------------------------------------------------------------
 
-type Variant = "primary" | "quiet" | "line" | "text" | "danger" | "secondary" | "ghost";
+type Variant = "primary" | "quiet" | "line" | "text";
 
 const buttonVariants: Record<Variant, string> = {
   primary: "bg-accent text-on-accent hover:bg-accent/90",
   quiet: "bg-surface-2 text-ink hover:bg-line/60",
   line: "border border-line bg-surface text-ink hover:bg-surface-2",
   text: "bg-transparent text-accent-ink hover:bg-accent-soft",
-  danger: "bg-bad text-white hover:bg-bad/90",
-  // Older names, kept so unconverted screens keep working.
-  secondary: "border border-line bg-surface text-ink hover:bg-surface-2",
-  ghost: "bg-transparent text-ink-2 hover:bg-surface-2",
 };
 
 const sizes = {

@@ -6,7 +6,7 @@
    Design tokens — "Checklist": calm teal ink on pool mist.
    Stored as RGB channels so Tailwind's opacity modifiers work (bg-ink/50).
    Every text pairing here was checked at >= 4.5:1 in both themes.
-   The dark set applies once <html> carries .theme-auto (it follows the phone).
+   The dark set follows the phone's own light/dark setting.
    ========================================================================== */
 :root {
   color-scheme: light;
@@ -37,7 +37,7 @@
 }
 
 @media (prefers-color-scheme: dark) {
-  :root.theme-auto {
+  :root {
     color-scheme: dark;
     --bg: 12 21 22;
     --surface: 19 33 35;
@@ -253,22 +253,6 @@ input[type="number"]::-webkit-inner-spin-button {
 .num-tabular {
   font-variant-numeric: tabular-nums;
   font-feature-settings: "tnum";
-}
-
-/* Small uppercase section label. */
-.micro-label {
-  font-size: 0.6875rem;
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-/* The full-screen wizard must clear phone notches and home bars. */
-.safe-area {
-  padding-top: max(1.25rem, env(safe-area-inset-top));
-  padding-bottom: max(1.25rem, env(safe-area-inset-bottom));
-  padding-left: max(1rem, env(safe-area-inset-left));
-  padding-right: max(1rem, env(safe-area-inset-right));
 }
 
 @media (prefers-reduced-motion: reduce) {

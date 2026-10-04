@@ -6,11 +6,8 @@
 
 import "server-only";
 import { getSupabase } from "./supabase";
-import {
-  DEFAULT_TARGET_RANGES,
-  DEFAULT_DOSING_CONSTANTS,
-  type SpaConfig,
-} from "./chemistry";
+// Pure row conversions live in ./rows so pure code can use them too.
+export { toSpaConfig, toTaskLike } from "./rows";
 import type {
   SpaSettings,
   MaintenanceTaskRow,
@@ -37,21 +34,6 @@ export async function getSettings(): Promise<SpaSettings> {
     );
   }
   return data as SpaSettings;
-}
-
-// Turn the stored settings row into the pure-calculator's SpaConfig shape,
-// backfilling any missing keys with defaults so old rows keep working.
-export function toSpaConfig(settings: SpaSettings): SpaConfig {
-  return {
-    volumeLitres: Number(settings.volume_litres),
-    sanitizerType: settings.sanitizer_type,
-    sanitizerUnit: settings.sanitizer_unit ?? "ppm",
-    targetRanges: { ...DEFAULT_TARGET_RANGES, ...(settings.target_ranges ?? {}) },
-    dosingConstants: {
-      ...DEFAULT_DOSING_CONSTANTS,
-      ...(settings.dosing_constants ?? {}),
-    },
-  };
 }
 
 export async function getTasks(): Promise<MaintenanceTaskRow[]> {
@@ -249,12 +231,3 @@ export async function pruneProbeReadings(
 }
 
 // Map a MaintenanceTaskRow into the camelCase shape the pure task helpers use.
-export function toTaskLike(row: MaintenanceTaskRow) {
-  return {
-    taskKey: row.task_key,
-    name: row.name,
-    taskType: row.task_type,
-    frequencyDays: row.frequency_days,
-    lastCompletedAt: row.last_completed_at,
-  };
-}

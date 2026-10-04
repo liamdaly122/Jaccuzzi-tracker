@@ -137,15 +137,22 @@ export default function HeatingPlanCard({
   const [heaterOn, setHeaterOn] = useHeaterOn();
   // Seed from the saved schedule so a freshly loaded, unedited one never
   // looks changed.
-  const [readyTime, setReadyTime] = useState(
-    () => schedule?.time ?? toTimeInput(new Date(defaultReadyAtIso)),
-  );
+  // Without a saved schedule the default time is filled in on the phone, so
+  // it's in the phone's timezone rather than the server's.
+  const [readyTime, setReadyTime] = useState(() => schedule?.time ?? "");
   const [target, setTarget] = useState(targetC);
   const [saved, setSaved] = useState<HeatingSchedule | null>(schedule);
   const [days, setDays] = useState<number[]>(() => schedule?.weekdays ?? [0, 1, 2, 3, 4, 5, 6]);
   const [saving, setSaving] = useState(false);
   const [now, setNow] = useState(() => new Date(nowIso));
-  useEffect(() => setNow(new Date()), []);
+  // Clock times are only drawn once this is running on the phone: the server
+  // runs on UTC, and a time drawn there would be an hour out in summer.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setNow(new Date());
+    setReadyTime((t) => t || toTimeInput(new Date(defaultReadyAtIso)));
+    setMounted(true);
+  }, [defaultReadyAtIso]);
 
   const readyAt = useMemo(() => {
     if (saved) {
@@ -213,7 +220,7 @@ export default function HeatingPlanCard({
           <div className="flex flex-wrap items-end gap-x-3.5 gap-y-3">
             <label className="grid flex-auto gap-1">
               <span className="text-[12.5px] font-bold text-ink-3">
-                Ready by · {dayWord(readyAt, now)}
+                Ready by{mounted ? ` · ${dayWord(readyAt, now)}` : ""}
               </span>
               <input
                 type="time"
@@ -295,7 +302,9 @@ export default function HeatingPlanCard({
 
       <Section title="Today's heat-up">
         <Card>
-          {currentC === null || !plan ? (
+          {!mounted ? (
+            <p className="text-sm text-ink-2">Working out the timing…</p>
+          ) : currentC === null || !plan ? (
             <p className="text-sm text-ink-2">
               This needs the water temperature from your probe.
             </p>

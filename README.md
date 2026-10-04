@@ -200,8 +200,8 @@ Gemini AI. No card, no cost — there's a generous free daily limit.
 5. Vercel → **Deployments** → open the latest → **⋯ → Redeploy** so the new key
    takes effect.
 
-Now, on the **🧪 Test the water** screen you'll see a **"📷 Scan strip with
-camera"** button. Snap the wet strip in good light, wait a moment, and the
+Now, on the **Test the water** screen you'll see a **"Scan a strip"**
+button. Snap the wet strip in good light, wait a moment, and the
 numbers pre-fill. **Always double-check each value against the strip before
 saving** — especially your sanitizer — because the camera can misread colours.
 Left the key out? The button simply doesn't appear and you type readings in as
@@ -228,9 +228,9 @@ no typing.
 3. Add: Name `IOPOOL_API_KEY`, Value = *(paste the key)*, then **Save**.
 4. Vercel → **Deployments** → open the latest → **⋯ → Redeploy**.
 
-You'll then get a **"Live from your probe"** card at the top of the Today
-screen showing your current pH, ORP and water temperature, and a **"Read my
-iopool probe"** button on the test screen that fills those numbers in for you.
+You'll then see your live water temperature, pH and chlorine at the top of
+**Today** (with the last day's trend on the **Water** tab), and a **"Use my
+probe"** button on the test screen that fills those numbers in for you.
 
 > The probe measures pH, ORP and temperature — **not alkalinity**. So you'll
 > still want a test strip for alkalinity every so often. Pop that number in
@@ -240,9 +240,9 @@ iopool probe"** button on the test screen that fills those numbers in for you.
 
 ## Turn on weather warnings 🌦️ (no setup, no key)
 
-In the app, open **Settings → "Your location (for weather warnings)"** and type
-your town or postcode, then **Save**. The Today screen then shows the next few
-days and warns you about **frost** (protect the pump/pipes) or **hot, sunny
+In the app, tap the **settings button** (top right of Today), then **Location**,
+type your town or postcode and tap **Save**. The **Heat** tab then shows the next
+few days and warns you about **frost** (protect the pump/pipes) or **hot, sunny
 spells** (your sanitizer burns off faster). Leave it blank to keep weather off.
 This uses a free service with no key needed.
 
@@ -250,103 +250,85 @@ This uses a free service with no key needed.
 
 ## 🧑‍🔧 How to use it day to day
 
-- **Test the water:** tap **🧪 Test**, dip your strip, type in the numbers. The
-  app instantly tells you what to add, **in the right order** (alkalinity → pH →
-  sanitizer → shock) and **how many grams**. Tap **"Log this as added"** to keep
-  a record.
-- **Today screen:** shows your latest water status, anything that's due, and a
-  **Water freshness** card that works out how often to drain & refill based on
-  your tub size and how many people use it (one tap applies it to your
-  schedule).
-- **Trends (📈 on the Today screen):** line graphs of your pH, alkalinity and
-  sanitizer over time, so you can spot the water drifting before it's a problem.
-- **Tasks:** tick off jobs like rinsing the filter. The next due date updates
-  itself. You can change how often each task repeats.
-- **Calendar:** tap any day to see what's scheduled, browse months, and see an
-  "upcoming" list of what's next.
-- **Something wrong? (🔎):** on the Today screen or Guides page, pick what you're
-  seeing — cloudy, foamy, green, smelly, itchy skin — and it lists the likely
-  causes and fixes, putting the ones your latest test points at first.
-- **Calibration (in Settings):** as you log tests and doses, the app quietly
-  learns how *your* tub actually responds and offers a one-tap tweak so future
-  dose suggestions get more accurate.
-- **Trends:** with an iopool probe connected, the app quietly banks each
-  reading it sees, so the sanitiser-strength (ORP) and temperature charts fill
-  in on their own — no typing. It keeps six months of history and tidies up
-  anything older automatically.
-- **Water freshness:** the app weighs how old the water is, how many
-  person-soaks it's had, and whether you're using **more sanitiser than you
-  were a fortnight ago** — that last one is the water telling you it's tiring,
-  usually before the calendar does. It also shows what a refill costs to heat,
-  so you change it on the numbers rather than out of habit.
-- **Heating plan (Today screen):** tells you what time to switch the heater on so
-  the water is at temperature when you actually want to get in. This is less
-  obvious than it sounds — from 20 °C your tub takes about **14 hours**, and from
-  cold in winter closer to **25**, so "I'll put it on when I get home" doesn't
-  work. Set when you want it ready (it pre-fills from when you usually soak) and
-  it works backwards, allowing for how cold it is outside. At first it estimates
-  from your tub size; once the probe has recorded a few real heat-ups it uses
-  what *your* tub actually manages. It also tells you whether it's cheaper to
-  leave it hot or let it cool between soaks — that flips somewhere around three
-  soaks a week, so it's genuinely worth checking. **Save your schedule** — pick
-  the days and the time and tap Save — and the card opens on it every time and
-  the morning reminder follows it. (Without a saved schedule the app guesses
-  from the soaks you've logged, which stops working if you stop logging.) Set
-  the temperature you
-  actually soak at with the +/− buttons on the card (up to 40 °C, which is the
-  hottest the tub will go) — it saves straight away and everything else follows
-  it. On days you'd normally soak, the morning push says when to flick the
-  switch.
-- **Running costs (Today screen):** what the tub actually costs — per day, month
-  and year, and per soak — split into keeping it warm, the lid being off while
-  you're in it, and the filtration pump. It also says whether it's cheaper to
-  hold it hot or let it cool, and what shutting down for winter would save.
-  Everything here rests on one number: how fast the water cools with the covers
-  on. The app measures that from your probe automatically, and you can enter
-  your own measurement on the card. **Worth doing** — without a figure it
-  assumes a bare uninsulated tub, which on a well-covered spa overstates the
-  running cost several times over.
-- **Collapsible cards:** tap any card heading on the Today screen to fold it
-  away, and it stays folded next time. Weather, water freshness, heater
-  protection and running costs start collapsed; the live probe and heating plan
-  stay open. (The "do not use the spa yet" safety warning can never be folded
-  away.)
-- **Heater protection (Today screen):** every other check looks at one number on
-  its own. This one looks at pH, alkalinity, calcium **and water temperature
-  together** — because they can each read "in range" while the combination
-  quietly furs up your heating element, which is the expensive thing to replace.
-  It needs a **calcium hardness** number, which your probe can't measure but
-  most 6-in-1 strips can. Enter one every few weeks (calcium barely moves) and
-  the card comes alive, with a matching chart on the Trends page.
-- **Stabiliser (cyanuric acid):** if your strip has a CYA pad, put the number in
-  too — the field sits just under calcium on the test form. It does two jobs.
-  It makes heater protection exact rather than approximate (your alkalinity
-  reading includes stabiliser, which doesn't actually take part in scaling, so
-  without this the app deliberately warns a little early). And it's the one
-  reading with **no chemical answer**: dichlor adds stabiliser with every dose,
-  nothing removes it, and past ~100 ppm chlorine stops working however much you
-  add. At that point the app stops suggesting doses and tells you plainly that
-  it's time to drain and refill.
-- **Winter shutdown (Upkeep screen):** from about three months out, a countdown
-  bar appears showing when to shut the tub down for the cold months, worked out
-  from where you live — and it jumps forward if a frost actually turns up in the
-  forecast. It compares what each option costs: leaving it running on Freeze
-  Shield all winter, versus packing it away (nothing all winter, plus one refill
-  in spring). Pick one and the app goes quiet until you wake it up — no more
-  reminders to test water that isn't there. If the tub is staying outside, frost
-  warnings carry on regardless. There's a full step-by-step guide for packing it
-  away and another for getting it back out in spring, and both remember your
-  ticks between sessions, because the job spans a weekend.
-- **Test strips or a probe:** in Settings you can switch between **ppm** (test
-  strips) and **ORP** (a probe such as an iopool, measured in millivolts). ORP
-  measures whether your sanitiser is actually *working*, which is the better
-  signal. The two can't be converted into one another, so in ORP mode the app
-  tells you if the water is sanitising and guides a gradual top-up instead of
-  inventing an exact gram figure — enter a ppm alongside it any time you want
-  exact doses back.
-- **Settings:** switch between chlorine/bromine, choose ppm or ORP, set your
-  water volume and how many people use it on an average day, set your location
-  for weather warnings, and fine-tune targets if your product label differs.
+Along the bottom are four tabs and a big **+** in the middle.
+
+- **+ Log** (on every screen): the one button for anything you've just done:
+  **test the water**, **log a soak**, **add a chemical** or **mark a job done**.
+  Ticking a job off shows an **Undo** for a few seconds in case of a mis-tap.
+- **Today:** what to do now, and nothing else. Three numbers at the top (water
+  temperature, pH and chlorine), then **one to-do list** in order of importance:
+  chemicals to add, when to switch the heater on, anything overdue, then what's
+  due today. Each line is short; tap **Why?** for the reasoning. Tick a line to
+  do it: a job is saved, a chemical asks how much went in, and the heater line
+  just remembers you've switched it on today. **"N more this month"** opens
+  what's coming up. If the water isn't safe, a red **"Don't get in yet"** banner
+  sits on top and can't be dismissed. The settings button is top right.
+- **Test the water** (from Today or **+**): tap **Use my probe** to fill pH and
+  ORP, or **Scan a strip** for a photo of the strip, or step each number with
+  − and +. **See what to add** saves the test and lists what to add, **numbered
+  in the right order** (alkalinity → pH → sanitiser), with a wait between each
+  and an **I've added it** button that logs the dose. Then one line says what's
+  fine and one says whether the heater is safe. Saving a test also ticks off the
+  "Test the water" job.
+- **Water:** everything about the water itself.
+  - **From your probe:** live temperature, pH and ORP with the last day's trend.
+  - **Last strip test:** each reading with OK, Low or High.
+  - **Heater protection:** pH, alkalinity, calcium **and temperature judged
+    together**, because they can each read "in range" while the combination
+    quietly furs up the heating element. It needs a **calcium** reading, which
+    the probe can't measure but most 6-in-1 strips can; one every few weeks is
+    plenty. Add **stabiliser (CYA)** too if your strip has it: it makes this
+    exact, and past ~100 ppm chlorine stops working however much you add, so
+    the app tells you plainly it's time to drain and refill.
+  - **Water age:** weighs how old the water is, how many person-soaks it's had,
+    and whether you're using **more sanitiser than a fortnight ago** (the water
+    telling you it's tiring, usually before the calendar does). One tap sets
+    your drain-and-refill reminder to match.
+  - **Trends:** pH, ORP, alkalinity, chlorine, balance and temperature over
+    time. The probe's readings are banked automatically (six months kept).
+  - **History:** every test, dose and soak.
+- **Heat:** when to switch on, and what it costs.
+  - **Your soak:** when you want it ready, how hot, and which days. **Save** it
+    and the morning reminder follows it. The temperature saves as soon as you
+    change it (up to 40 °C, the tub's maximum).
+  - **Today's heat-up:** what time to switch on so it's ready on time, worked
+    backwards from the water temperature, the weather and how well your tub
+    holds heat. From cold this can be **14 hours or more**, so "I'll put it on
+    when I get home" doesn't work. Once the probe has seen a few real heat-ups
+    it uses what *your* tub actually manages. Tap **It's on** when you have.
+  - **Leave it on instead?** Letting it cool between soaks never costs more
+    than keeping it hot; with good covers the saving is small (pence a week)
+    and the price is switching on a couple of hours before each soak.
+  - **Running costs:** per day, month, year and soak, split into keeping it
+    warm, the lid off while you're in, and the filter pump. It all rests on how
+    fast the water cools with the covers on, which the app measures from your
+    probe (or you can enter your own).
+  - **Weather:** the next three days and any frost, heat or heavy-rain warning.
+- **Care:** looking after the tub.
+  - **Jobs** (or the same as a **Calendar**): each with how much life it has
+    left, a **Done** button and how often it repeats (tap to change).
+  - **Winter plan:** from about three months out, a countdown to when to shut
+    down for the cold months, worked out from where you live, and sooner if
+    frost turns up in the forecast. It compares what each option costs. **Pack
+    it away** and the app goes quiet until you **Wake it up**. **Leave it
+    running** (Freeze Shield) keeps every reminder going, because the water
+    still needs looking after.
+  - **Guides:** step-by-step drain and refill, winterising and spring wake-up.
+    Your ticks are remembered, because these jobs span a weekend.
+  - **Something wrong?** Pick what you're seeing (cloudy, foamy, green,
+    smelly, itchy skin...) for the likely causes and fixes, with the ones your
+    last test points at first.
+- **Settings** (top right of Today): chlorine or bromine, test strips (ppm) or a
+  probe (ORP), water volume, people per day, location, phone calendar, and
+  fine-tuning. ORP measures whether the sanitiser is actually *working*; it
+  can't be converted to ppm, so in ORP mode the app guides a gradual top-up
+  instead of inventing exact grams (add a strip's ppm to a test for exact
+  doses). **Calibration** learns how *your* tub responds to doses and offers a
+  one-tap tweak.
+- **Fresh water setup** (Settings, or after the drain-and-refill guide): a
+  step-by-step flow from a fresh fill to safe water, with the exact doses for
+  your tub. It can be finished on probe readings alone.
+- **Dark mode** follows your phone's setting.
 
 ---
 
