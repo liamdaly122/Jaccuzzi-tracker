@@ -4,8 +4,10 @@ import { hibernationState, winterWindow } from "@/lib/winter";
 import {
   effectiveHeaterWatts,
   heatingPlan,
+  observedCoolingRate,
   observedHeatingRate,
   parseHeatingSchedule,
+  resolveHeatLoss,
   resolveReadyAt,
   soakPattern,
 } from "@/lib/heating";
@@ -22,7 +24,11 @@ import {
 import { computeNextDue } from "@/lib/tasks";
 import { calculateRecommendations } from "@/lib/chemistry";
 import { buildForecasts } from "@/lib/predict";
-import { usageWaterStatus, sanitiserDemandTrend } from "@/lib/water";
+import {
+  usageWaterStatus,
+  sanitiserDemandTrend,
+  DEFAULT_ELECTRICITY_PRICE_PER_KWH,
+} from "@/lib/water";
 import { getForecast, weatherAdvice } from "@/lib/weather";
 import { getIopoolReading, isIopoolConfigured } from "@/lib/iopool";
 import {
@@ -228,8 +234,26 @@ async function handle(request: NextRequest) {
       const waterC = probeWaterC;
 
       if (isToday && waterC !== null) {
-        const rate = observedHeatingRate(await getRecentProbeReadings(400));
-        const heater = effectiveHeaterWatts(rate, ambientForHeating, config.volumeLitres);
+        const probeRows = await getRecentProbeReadings(400);
+        const rate = observedHeatingRate(probeRows);
+        // Resolved exactly as the dashboard does — measured cooling, then the
+        // saved figure, then the uninsulated guess — so this push and the
+        // heating card always name the same switch-on time.
+        const heatLoss = resolveHeatLoss({
+          cooling: observedCoolingRate(probeRows),
+          ambientC: ambientForHeating,
+          savedWPerK:
+            settings.heat_loss_w_per_k == null
+              ? null
+              : Number(settings.heat_loss_w_per_k),
+          volumeLitres: config.volumeLitres,
+        });
+        const heater = effectiveHeaterWatts(
+          rate,
+          ambientForHeating,
+          config.volumeLitres,
+          heatLoss.uaWPerK,
+        );
         const plan = heatingPlan({
           currentC: waterC,
           targetC: soakTargetC,
@@ -237,6 +261,8 @@ async function handle(request: NextRequest) {
           ambientC: ambientForHeating,
           watts: heater.watts,
           volumeLitres: config.volumeLitres,
+          uaWPerK: heatLoss.uaWPerK,
+          pricePerKwh: DEFAULT_ELECTRICITY_PRICE_PER_KWH,
           now,
         });
         if (plan && !plan.alreadyWarmEnough && !plan.unreachable) {

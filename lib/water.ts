@@ -202,10 +202,13 @@ export function sanitiserDemandTrend(
 //  Cost of a refill — the reason NOT to change water out of habit
 // =============================================================================
 
-// Rough UK figures; the kWh number is the durable part, the price is indicative.
+// The kWh figures are the durable part; prices are indicative.
 export const FILL_TEMP_RISE_C = 28; // ~10°C mains -> ~38°C
 export const SPECIFIC_HEAT_KJ_PER_KG_K = 4.186;
-export const DEFAULT_ELECTRICITY_PRICE_PER_KWH = 0.245;
+// The UK price-cap unit rate the owner is on. ONE figure for the whole app —
+// heating plan, running costs, winter comparison and refill cost all read it,
+// so no two cards can price the same kilowatt-hour differently.
+export const DEFAULT_ELECTRICITY_PRICE_PER_KWH = 0.2611;
 export const DEFAULT_WATER_PRICE_PER_M3 = 4.0; // supply + sewerage combined
 
 export interface RefillCost {

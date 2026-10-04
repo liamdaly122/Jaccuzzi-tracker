@@ -27,6 +27,7 @@ import {
   heatingRateCPerHour,
   standbyKwhPerDay,
 } from "../lib/thermal";
+import { DEFAULT_ELECTRICITY_PRICE_PER_KWH } from "../lib/water";
 
 const V = 1180; // the user's tub
 const P = NAMEPLATE_HEATER_WATTS;
@@ -137,6 +138,7 @@ describe("effectiveHeaterWatts", () => {
       { ratePerHour: null, samples: 2, meanWaterC: null },
       12,
       V,
+      UA,
     );
     expect(out.watts).toBe(NAMEPLATE_HEATER_WATTS);
     expect(out.measured).toBe(false);
@@ -146,15 +148,15 @@ describe("effectiveHeaterWatts", () => {
     // The same climb rate observed on a cold day implies a STRONGER heater
     // than on a warm one, because more was being lost at the time.
     const rate = { ratePerHour: 1.2, samples: 9, meanWaterC: 28 };
-    const cold = effectiveHeaterWatts(rate, 2, V);
-    const mild = effectiveHeaterWatts(rate, 18, V);
+    const cold = effectiveHeaterWatts(rate, 2, V, UA);
+    const mild = effectiveHeaterWatts(rate, 18, V, UA);
     expect(cold.watts).toBeGreaterThan(mild.watts);
     expect(cold.measured).toBe(true);
   });
 
   it("keeps a wild observation from producing a wild prediction", () => {
     const silly = { ratePerHour: 2.9, samples: 20, meanWaterC: 35 };
-    const out = effectiveHeaterWatts(silly, 20, V);
+    const out = effectiveHeaterWatts(silly, 20, V, UA);
     expect(out.watts).toBeLessThanOrEqual(NAMEPLATE_HEATER_WATTS * 1.5);
   });
 
@@ -164,6 +166,7 @@ describe("effectiveHeaterWatts", () => {
       { ratePerHour: observed, samples: 8, meanWaterC: 26 },
       12,
       V,
+      UA,
     );
     expect(heatingRateCPerHour(26, 12, watts, V)).toBeCloseTo(observed, 1);
   });
@@ -179,6 +182,7 @@ describe("heatingPlan", () => {
     ambientC: 15,
     watts: P,
     volumeLitres: V,
+    uaWPerK: UA,
     now: morning,
   };
 
@@ -249,14 +253,14 @@ describe("heatingPlan", () => {
 
 describe("reachableByC", () => {
   it("says how warm it could get in the time available", () => {
-    const got = reachableByC(20, 6, 15, P, V);
+    const got = reachableByC(20, 6, 15, P, V, UA);
     expect(got).toBeGreaterThan(20);
     expect(got).toBeLessThan(38); // six hours isn't enough from 20 °C
   });
 
   it("approaches equilibrium but never passes it", () => {
     const e = equilibriumTempC(15, P, UA);
-    expect(reachableByC(20, 500, 15, P, V)).toBeLessThanOrEqual(e + 0.1);
+    expect(reachableByC(20, 500, 15, P, V, UA)).toBeLessThanOrEqual(e + 0.1);
   });
 });
 
@@ -344,6 +348,7 @@ describe("keepWarmVsReheat", () => {
     coolsToC: 16,
     watts: P,
     volumeLitres: V,
+    uaWPerK: UA,
   };
 
   it("tells an occasional user to let it cool", () => {
@@ -379,7 +384,8 @@ describe("keepWarmVsReheat", () => {
 
   it("agrees with the standby figure it's built on", () => {
     const r = keepWarmVsReheat({ ...base, soaksPerWeek: 3 })!;
-    const expected = standbyKwhPerDay(38, 12, V) * 7 * 0.27;
+    const expected =
+      standbyKwhPerDay(38, 12, V) * 7 * DEFAULT_ELECTRICITY_PRICE_PER_KWH;
     expect(r.keepWarmWeekly).toBeCloseTo(expected, 1);
   });
 });
@@ -439,6 +445,7 @@ describe("soak temperature", () => {
       coolsToC: 16,
       watts: P,
       volumeLitres: V,
+      uaWPerK: UA,
     })!;
     const at40 = keepWarmVsReheat({
       soaksPerWeek: 5,
@@ -447,6 +454,7 @@ describe("soak temperature", () => {
       coolsToC: 16,
       watts: P,
       volumeLitres: V,
+      uaWPerK: UA,
     })!;
     expect(at40.keepWarmWeekly).toBeGreaterThan(at38.keepWarmWeekly);
   });
@@ -686,6 +694,27 @@ describe("heat loss changes the answers the app gives", () => {
     const genericMild = heatingRateCPerHour(40, 14, P, V);
     const genericFreezing = heatingRateCPerHour(40, 0, P, V);
     expect(Math.abs(genericMild - genericFreezing) / genericMild).toBeGreaterThan(0.2);
+  });
+
+  it("moves the switch-on time later once the plan is given the real figure", () => {
+    // The bug: the heating card and the morning push never passed the
+    // measured figure through, so both planned for a bare tub and told an
+    // insulated one to switch on half an hour early.
+    const common = {
+      currentC: 37.5,
+      targetC: 40,
+      readyAt: new Date("2026-10-04T16:00:00.000Z"),
+      ambientC: 14,
+      watts: P,
+      volumeLitres: V,
+      now: new Date("2026-10-04T09:00:00.000Z"),
+    };
+    const bare = heatingPlan({ ...common, uaWPerK: UA })!;
+    const real = heatingPlan({ ...common, uaWPerK: insulated })!;
+    const minutesLater =
+      (real.switchOnAt!.getTime() - bare.switchOnAt!.getTime()) / 60_000;
+    expect(minutesLater).toBeGreaterThan(25);
+    expect(minutesLater).toBeLessThan(40);
   });
 
   it("still reproduces the old numbers when nothing is known", () => {

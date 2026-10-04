@@ -34,6 +34,7 @@ import {
   sanitiserDemandTrend,
   waterChangeVerdict,
   estimateRefillCost,
+  DEFAULT_ELECTRICITY_PRICE_PER_KWH,
 } from "@/lib/water";
 import { buildForecasts } from "@/lib/predict";
 import { lsiSnapshot } from "@/lib/balance";
@@ -299,7 +300,7 @@ export default async function DashboardPage() {
     targetC: soakTargetC,
     ambientC,
     volumeLitres: config.volumeLitres,
-    pricePerKwh: 0.2611,
+    pricePerKwh: DEFAULT_ELECTRICITY_PRICE_PER_KWH,
     soakHoursPerDay: perWeek > 0 ? Math.min(2, (perWeek * 1) / 7) : 0,
     lidOffLossCPerH: 1.25,
     filterHoursPerDay: probe?.filtrationHours ?? undefined,
@@ -364,7 +365,8 @@ export default async function DashboardPage() {
         measured={heater.measured}
         samples={heater.samples}
         volumeLitres={config.volumeLitres}
-        pricePerKwh={0.27}
+        uaWPerK={heatLoss.uaWPerK}
+        pricePerKwh={DEFAULT_ELECTRICITY_PRICE_PER_KWH}
         defaultReadyAtIso={readyAt.toISOString()}
         nowIso={now.toISOString()}
         patternNote={patternNote}
@@ -676,7 +678,7 @@ export default async function DashboardPage() {
           basis={heatLoss.basis}
           standingLossCPerH={heatLoss.standingLossCPerH}
           impliedU={impliedUValue(heatLoss.uaWPerK, config.volumeLitres)}
-          pricePerKwh={0.2611}
+          pricePerKwh={DEFAULT_ELECTRICITY_PRICE_PER_KWH}
           deltaTK={Math.max(1, (waterC ?? soakTargetC) - ambientC)}
           volumeLitres={config.volumeLitres}
         />

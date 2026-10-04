@@ -28,7 +28,8 @@
 //  Sources: Lay-Z-Spa UK's winter care and pack-away guidance.
 // =============================================================================
 
-import { defaultHeatLossPerKelvin, heatLossAreaM2 } from "./thermal";
+import { heatLossAreaM2 } from "./thermal";
+import { DEFAULT_ELECTRICITY_PRICE_PER_KWH } from "./water";
 
 // Re-exported so existing callers and tests keep their import path.
 export { heatLossAreaM2 };
@@ -214,13 +215,12 @@ export function winterCountdown(
 // The whole reason for shutting down is money, so the comparison has to be
 // honest about how rough it is. Two things are modelled, both stated:
 //
-//  1. Heat loss is Q = U x A x dT. Surface area is derived from the tub's own
-//     water volume (assuming a square tub at typical fill depth) so this works
-//     for any spa, not just this one. U is the weak assumption — an air-filled
-//     vinyl wall with the cover on is somewhere around 2-4 W/m2K — so the answer
-//     comes back as a RANGE, not a single figure dressed up as precision.
-//  2. The range's ends are a mild winter's day and a cold snap, not a best and
-//     worst case of the physics.
+//  1. Heat loss is Q = UA x dT, where UA (W/K) is this tub's own figure —
+//     watched by the probe, entered by the owner, or the uninsulated estimate
+//     as a last resort (resolveHeatLoss in lib/heating.ts). The caller must
+//     pass it in: assuming a bare tub overstated an insulated one several times.
+//  2. The answer is a RANGE, not a single figure dressed up as precision: its
+//     ends are a mild winter's day and a cold snap.
 //
 // Packing down costs nothing all winter; its only cost is refilling in spring,
 // which lib/water.ts already knows how to price.
@@ -245,12 +245,13 @@ export interface WinterCostComparison {
 }
 
 export function compareWinterCosts(
-  volumeLitres: number,
   days: number,
-  opts: { pricePerKwh?: number; refillCost?: number; uaWPerK?: number } = {},
+  // Heat loss is required: Freeze Shield's cost is almost entirely heat loss,
+  // so a bare-tub default overstates it several times for an insulated tub.
+  opts: { pricePerKwh?: number; refillCost?: number; uaWPerK: number },
 ): WinterCostComparison {
-  const pricePerKwh = opts.pricePerKwh ?? 0.27;
-  const ua = opts.uaWPerK ?? defaultHeatLossPerKelvin(volumeLitres);
+  const pricePerKwh = opts.pricePerKwh ?? DEFAULT_ELECTRICITY_PRICE_PER_KWH;
+  const ua = opts.uaWPerK;
 
   const dailyKwh = (ambientC: number): number => {
     const deltaT = Math.max(0, FREEZE_SHIELD_MEAN_WATER_C - ambientC);

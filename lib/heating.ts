@@ -29,6 +29,7 @@ import {
   standbyKwhPerDay,
   thermalMassKwhPerK,
 } from "./thermal";
+import { DEFAULT_ELECTRICITY_PRICE_PER_KWH } from "./water";
 
 const HOUR_MS = 60 * 60 * 1000;
 
@@ -118,7 +119,7 @@ export function effectiveHeaterWatts(
   rate: HeatingRate,
   ambientC: number,
   volumeLitres: number,
-  uaWPerK: number = defaultHeatLossPerKelvin(volumeLitres),
+  uaWPerK: number,
 ): { watts: number; measured: boolean; samples: number } {
   if (rate.ratePerHour === null || rate.meanWaterC === null) {
     return { watts: NAMEPLATE_HEATER_WATTS, measured: false, samples: rate.samples };
@@ -248,7 +249,9 @@ export interface HeatingPlanInput {
   ambientC: number;
   watts: number;
   volumeLitres: number;
-  uaWPerK?: number;
+  /** Required on purpose: defaulting to the bare-tub figure is how the heating
+   *  card and morning push came to plan for an uninsulated tub. */
+  uaWPerK: number;
   pricePerKwh?: number;
   now?: Date;
 }
@@ -271,8 +274,8 @@ export interface HeatingPlan {
 export function heatingPlan(input: HeatingPlanInput): HeatingPlan | null {
   const { currentC, targetC, readyAt, ambientC, watts, volumeLitres } = input;
   const now = input.now ?? new Date();
-  const pricePerKwh = input.pricePerKwh ?? 0.27;
-  const ua = input.uaWPerK ?? defaultHeatLossPerKelvin(volumeLitres);
+  const pricePerKwh = input.pricePerKwh ?? DEFAULT_ELECTRICITY_PRICE_PER_KWH;
+  const ua = input.uaWPerK;
 
   if (currentC === null || !Number.isFinite(currentC)) return null;
   if (!Number.isFinite(readyAt.getTime())) return null;
@@ -324,7 +327,7 @@ export function reachableByC(
   ambientC: number,
   watts: number,
   volumeLitres: number,
-  uaWPerK: number = defaultHeatLossPerKelvin(volumeLitres),
+  uaWPerK: number,
 ): number {
   const equilibrium = equilibriumTempC(ambientC, watts, uaWPerK);
   const uaKw = uaWPerK / 1000;
@@ -549,7 +552,7 @@ export function keepWarmVsReheat(opts: {
   coolsToC: number;
   watts: number;
   volumeLitres: number;
-  uaWPerK?: number;
+  uaWPerK: number;
   pricePerKwh?: number;
 }): KeepWarmComparison | null {
   const {
@@ -560,8 +563,8 @@ export function keepWarmVsReheat(opts: {
     watts,
     volumeLitres,
   } = opts;
-  const price = opts.pricePerKwh ?? 0.27;
-  const ua = opts.uaWPerK ?? defaultHeatLossPerKelvin(volumeLitres);
+  const price = opts.pricePerKwh ?? DEFAULT_ELECTRICITY_PRICE_PER_KWH;
+  const ua = opts.uaWPerK;
   if (soaksPerWeek <= 0) return null;
 
   const keepWarmWeekly =

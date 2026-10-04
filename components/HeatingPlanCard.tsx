@@ -150,6 +150,9 @@ export interface HeatingPlanCardProps {
   measured: boolean;
   samples: number;
   volumeLitres: number;
+  /** Heat loss of this tub (W/K) — measured, saved or estimated. Without it
+   *  the plan assumes a bare, uninsulated tub and says switch on far too early. */
+  uaWPerK: number;
   pricePerKwh: number;
   defaultReadyAtIso: string;
   nowIso: string;
@@ -166,6 +169,7 @@ export default function HeatingPlanCard({
   measured,
   samples,
   volumeLitres,
+  uaWPerK,
   pricePerKwh,
   defaultReadyAtIso,
   nowIso,
@@ -250,10 +254,11 @@ export default function HeatingPlanCard({
         ambientC,
         watts,
         volumeLitres,
+        uaWPerK,
         pricePerKwh,
         now,
       }),
-    [currentC, target, readyAt, ambientC, watts, volumeLitres, pricePerKwh, now],
+    [currentC, target, readyAt, ambientC, watts, volumeLitres, uaWPerK, pricePerKwh, now],
   );
 
   // Nothing useful to say without a live water temperature.
@@ -426,7 +431,14 @@ export default function HeatingPlanCard({
               would have wanted switching on {hoursWord(plan.shortfallHours)} ago.
               Switch on now and you&apos;d be at about{" "}
               <strong>
-                {reachableByC(currentC, hoursAvailable, ambientC, watts, volumeLitres)}
+                {reachableByC(
+                  currentC,
+                  hoursAvailable,
+                  ambientC,
+                  watts,
+                  volumeLitres,
+                  uaWPerK,
+                )}
                 &nbsp;°C
               </strong>{" "}
               by then.

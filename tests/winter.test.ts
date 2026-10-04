@@ -11,6 +11,7 @@ import {
   winterLengthDays,
   winterWindow,
 } from "../lib/winter";
+import { defaultHeatLossPerKelvin } from "../lib/thermal";
 
 const AUG = new Date("2026-08-06T12:00:00.000Z");
 const iso = (d: Date) => d.toISOString().slice(0, 10);
@@ -153,7 +154,10 @@ describe("compareWinterCosts", () => {
 
   it("shows packing down saving real money over a UK winter", () => {
     const w = winterWindow(LEEDS, AUG)!;
-    const c = compareWinterCosts(1180, winterLengthDays(w), { refillCost: 12.4 });
+    const c = compareWinterCosts(winterLengthDays(w), {
+      refillCost: 12.4,
+      uaWPerK: defaultHeatLossPerKelvin(1180),
+    });
     expect(c.days).toBeGreaterThan(150);
     // A range, not false precision — the cold-snap end costs far more.
     expect(c.freezeShield.high).toBeGreaterThan(c.freezeShield.low * 2);
@@ -163,17 +167,33 @@ describe("compareWinterCosts", () => {
   });
 
   it("scales with the length of the winter and the price of power", () => {
-    const short = compareWinterCosts(1180, 90, { refillCost: 12 });
-    const long = compareWinterCosts(1180, 180, { refillCost: 12 });
+    // Both prices explicit: this pins proportionality, not the app's tariff.
+    const ua = defaultHeatLossPerKelvin(1180);
+    const short = compareWinterCosts(90, { refillCost: 12, uaWPerK: ua, pricePerKwh: 0.27 });
+    const long = compareWinterCosts(180, { refillCost: 12, uaWPerK: ua, pricePerKwh: 0.27 });
     expect(long.freezeShield.low).toBeCloseTo(short.freezeShield.low * 2, 0);
 
-    const pricey = compareWinterCosts(1180, 90, { refillCost: 12, pricePerKwh: 0.54 });
+    const pricey = compareWinterCosts(90, { refillCost: 12, uaWPerK: ua, pricePerKwh: 0.54 });
     expect(pricey.freezeShield.low).toBeCloseTo(short.freezeShield.low * 2, 0);
+  });
+
+  it("costs far less to keep ticking over once the tub is insulated", () => {
+    // Freeze Shield's cost is almost all heat loss, so a cover package changes
+    // the winter decision, not just the summer bill.
+    const bare = compareWinterCosts(150, {
+      refillCost: 12,
+      uaWPerK: defaultHeatLossPerKelvin(1180),
+    });
+    const covered = compareWinterCosts(150, { refillCost: 12, uaWPerK: 4.2 });
+    expect(covered.freezeShield.high).toBeLessThan(bare.freezeShield.high / 4);
   });
 
   it("never reports a negative saving", () => {
     // A tiny tub in a short, mild winter can cost less to run than to refill.
-    const c = compareWinterCosts(200, 20, { refillCost: 500 });
+    const c = compareWinterCosts(20, {
+      refillCost: 500,
+      uaWPerK: defaultHeatLossPerKelvin(200),
+    });
     expect(c.saving.low).toBe(0);
     expect(c.saving.high).toBeGreaterThanOrEqual(0);
   });

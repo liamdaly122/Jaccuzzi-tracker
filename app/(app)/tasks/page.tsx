@@ -4,7 +4,14 @@ import CompleteButton from "@/components/CompleteButton";
 import FrequencyEditor from "@/components/FrequencyEditor";
 import { Badge, Card } from "@/components/ui";
 import WinterCard from "@/components/WinterCard";
-import { getTasks, toTaskLike, getSettings, toSpaConfig } from "@/lib/data";
+import {
+  getTasks,
+  toTaskLike,
+  getSettings,
+  toSpaConfig,
+  getRecentProbeReadings,
+} from "@/lib/data";
+import { observedCoolingRate, resolveHeatLoss } from "@/lib/heating";
 import { computeTaskLife } from "@/lib/tasks";
 import { getForecast } from "@/lib/weather";
 import { estimateRefillCost } from "@/lib/water";
@@ -53,6 +60,7 @@ export default async function TasksPage() {
   // Only fetch a forecast when it could actually change the advice — no point
   // calling out in June, or once the tub is already packed away.
   let forecastDays: { date: string; tempMin: number }[] = [];
+  let ambientC = 12; // the dashboard's fallback when there's no forecast
   if (
     !hibernation.hibernating &&
     window &&
@@ -65,14 +73,37 @@ export default async function TasksPage() {
       settings.location_name ?? undefined,
     );
     forecastDays = weather?.days.map((d) => ({ date: d.date, tempMin: d.tempMin })) ?? [];
+    const today = weather?.days[0];
+    if (today && Number.isFinite(today.tempMax) && Number.isFinite(today.tempMin)) {
+      ambientC = (today.tempMax + today.tempMin) / 2;
+    }
   }
 
   const countdown = winterCountdown(window, now, forecastDays);
-  const costs = window
-    ? compareWinterCosts(config.volumeLitres, winterLengthDays(window), {
-        refillCost: estimateRefillCost(config.volumeLitres).totalCost,
-      })
-    : null;
+
+  // Priced on the same insulation figure as the dashboard — measured, then
+  // saved, then the uninsulated guess. Freeze Shield's cost is nearly all heat
+  // loss, so the bare-tub default would overstate it several times over.
+  let costs = null;
+  if (window) {
+    let probeRows: Awaited<ReturnType<typeof getRecentProbeReadings>> = [];
+    try {
+      probeRows = await getRecentProbeReadings(400);
+    } catch {
+      probeRows = [];
+    }
+    const heatLoss = resolveHeatLoss({
+      cooling: observedCoolingRate(probeRows),
+      ambientC,
+      savedWPerK:
+        settings.heat_loss_w_per_k == null ? null : Number(settings.heat_loss_w_per_k),
+      volumeLitres: config.volumeLitres,
+    });
+    costs = compareWinterCosts(winterLengthDays(window), {
+      refillCost: estimateRefillCost(config.volumeLitres).totalCost,
+      uaWPerK: heatLoss.uaWPerK,
+    });
+  }
 
   return (
     <div className="space-y-4">
