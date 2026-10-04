@@ -11,9 +11,11 @@ import {
   commissioningChlorineGrams,
   stagePhase,
 } from "@/lib/startup";
-import { Button, Card } from "./ui";
+import { Button, Callout, Card, LinkButton } from "./ui";
 import ScanStripButton from "./ScanStripButton";
-import IopoolButton from "./IopoolButton";
+import IopoolButton, { SourceLine, type SourceMessage } from "./IopoolButton";
+import Stepper from "./Stepper";
+import { chemicalName } from "@/lib/todo";
 import Icon from "./Icon";
 import PhaseStepper from "./setup/PhaseStepper";
 import WaterBalanceGauge, { type GaugeMetric } from "./setup/WaterBalanceGauge";
@@ -62,6 +64,7 @@ export default function SetupWizard({
   const [safe, setSafe] = useState(false);
   const [finished, setFinished] = useState(false);
   const [dir, setDir] = useState<"fwd" | "back">("fwd");
+  const [source, setSource] = useState<SourceMessage | null>(null);
 
   const plan = useMemo(
     () => buildStartupPlan(sanitizer, Number(volume) || 0),
@@ -146,13 +149,13 @@ export default function SetupWizard({
         }),
       });
       if (!res.ok) {
-        setNote("Couldn't save that — please try again.");
+        setNote("That didn't save. Try again in a moment.");
         return false;
       }
       router.refresh();
       return true;
     } catch {
-      setNote("Couldn't save that — please try again.");
+      setNote("That didn't save. Try again in a moment.");
       return false;
     } finally {
       setBusy(false);
@@ -163,7 +166,7 @@ export default function SetupWizard({
     const phVal = ph.trim() === "" ? null : Number(ph);
     const taVal = ta.trim() === "" ? null : Number(ta);
     if (phVal === null || taVal === null) {
-      setNote("Please enter at least pH and alkalinity.");
+      setNote("pH and alkalinity are needed.");
       return null;
     }
     setBusy(true);
@@ -213,7 +216,7 @@ export default function SetupWizard({
           readingId: lastReadingId,
         }),
       });
-      setNote("Logged ✓");
+      setNote("Logged.");
       router.refresh();
     } catch {
       /* non-critical */
@@ -248,10 +251,10 @@ export default function SetupWizard({
         }
         router.refresh();
       } else {
-        setNote("Couldn't finish — please try again.");
+        setNote("That didn't finish. Try again in a moment.");
       }
     } catch {
-      setNote("Couldn't finish — please try again.");
+      setNote("That didn't finish. Try again in a moment.");
     } finally {
       setBusy(false);
     }
@@ -300,133 +303,126 @@ export default function SetupWizard({
   const hasAnyReading = gaugeMetrics.some((m) => m.value !== null);
 
   // --- shared test-capture block (used by test + retest actions) -------------
+  const toNum = (v: string) => (v.trim() === "" ? null : Number(v));
+  const toStr = (v: number | null) => (v === null ? "" : String(v));
+  const sanName = sanitizer === "chlorine" ? "Chlorine" : "Bromine";
   const testInputs = (
-    <div className="space-y-3">
-      {iopoolEnabled ? (
-        <IopoolButton
-          onValues={(pool) => {
-            const m = pool.measure;
-            if (m.ph != null) setPh(String(m.ph));
-            if (m.orpMv != null) setOrp(String(m.orpMv));
-          }}
-        />
+    <div className="grid gap-3">
+      {scanEnabled || iopoolEnabled ? (
+        <div>
+          <div className="flex flex-wrap gap-2">
+            {scanEnabled ? (
+              <ScanStripButton
+                className="min-w-[150px] flex-1"
+                sanitizerType={sanitizer}
+                onMessage={setSource}
+                onValues={(v) => {
+                  const s = sanitizer === "chlorine" ? v.freeChlorinePpm : v.brominePpm;
+                  if (v.ph != null) setPh(String(v.ph));
+                  if (v.totalAlkalinityPpm != null) setTa(String(v.totalAlkalinityPpm));
+                  if (s != null) setSan(String(s));
+                }}
+              />
+            ) : null}
+            {iopoolEnabled ? (
+              <IopoolButton
+                className="min-w-[150px] flex-1"
+                onMessage={setSource}
+                onValues={(pool) => {
+                  const m = pool.measure;
+                  if (m.ph != null) setPh(String(m.ph));
+                  if (m.orpMv != null) setOrp(String(m.orpMv));
+                }}
+              />
+            ) : null}
+          </div>
+          {source ? <SourceLine message={source} /> : null}
+        </div>
       ) : null}
-      {scanEnabled ? (
-        <ScanStripButton
-          sanitizerType={sanitizer}
-          onValues={(v) => {
-            const s =
-              sanitizer === "chlorine" ? v.freeChlorinePpm : v.brominePpm;
-            if (v.ph != null) setPh(String(v.ph));
-            if (v.totalAlkalinityPpm != null) setTa(String(v.totalAlkalinityPpm));
-            if (s != null) setSan(String(s));
-          }}
-        />
-      ) : null}
-      <div className="grid grid-cols-3 gap-2">
-        <LabelledInput label="pH" value={ph} onChange={setPh} placeholder="7.5" />
-        <LabelledInput
-          label="Alkalinity"
-          value={ta}
-          onChange={setTa}
-          placeholder="100"
-        />
-        <LabelledInput
-          label={sanitizer === "chlorine" ? "Chlorine" : "Bromine"}
-          value={san}
-          onChange={setSan}
-          placeholder="3"
-        />
-      </div>
-      {orpMode ? (
-        <LabelledInput
-          label="ORP (mV)"
-          value={orp}
-          onChange={setOrp}
-          placeholder="700"
-        />
-      ) : null}
+      <Card flush>
+        <StepRow name="pH">
+          <Stepper id="w-ph" label="pH" value={toNum(ph)} onChange={(v) => setPh(toStr(v))} step={0.1} min={6} max={9} decimals={1} start={7.5} />
+        </StepRow>
+        <StepRow name="Alkalinity">
+          <Stepper id="w-ta" label="alkalinity" value={toNum(ta)} onChange={(v) => setTa(toStr(v))} step={10} min={0} max={400} unit="ppm" start={100} />
+        </StepRow>
+        {orpMode ? (
+          <StepRow name="ORP">
+            <Stepper id="w-orp" label="ORP" value={toNum(orp)} onChange={(v) => setOrp(toStr(v))} step={10} min={0} max={1200} unit="mV" start={700} />
+          </StepRow>
+        ) : null}
+        <StepRow name={sanName}>
+          <Stepper id="w-san" label={sanName.toLowerCase()} value={toNum(san)} onChange={(v) => setSan(toStr(v))} step={0.5} min={0} max={20} decimals={1} unit="ppm" start={3} />
+        </StepRow>
+      </Card>
     </div>
   );
 
   if (finished) {
     return (
-      <div className="mx-auto max-w-md px-4 py-16 text-center">
-        <div className="anim-pop mx-auto mb-4 flex h-24 w-24 items-center justify-center rounded-full bg-emerald-50 text-emerald-600 shadow-[0_10px_30px_-10px_rgba(12,163,12,0.6)] ring-1 ring-emerald-100">
+      <div className="mx-auto grid min-h-screen max-w-[440px] content-center justify-items-center gap-3 px-4 py-16 text-center">
+        <div className="anim-pop grid h-24 w-24 place-items-center rounded-full bg-good-soft text-good-ink">
           <Icon name="check-seal" size={52} strokeWidth={1.5} />
         </div>
-        <h1 className="text-2xl font-bold text-slate-800">You&apos;re all set!</h1>
-        <p className="mt-2 text-slate-600">
-          Your water is balanced and safe, and I&apos;ve reset your
-          water-freshness tracking for the new water. Enjoy your soak.
+        <h1 className="text-[28px] font-extrabold tracking-tight">You&apos;re all set</h1>
+        <p className="text-[15.5px] leading-relaxed text-ink-2">
+          The water is balanced and safe, and its age has been reset for the new fill. Enjoy your
+          soak.
         </p>
-        <div className="mt-6">
-          <Link
-            href="/dashboard"
-            className="inline-flex items-center justify-center rounded-xl bg-brand-600 px-5 py-3 font-semibold text-white transition hover:bg-brand-700"
-          >
-            Go to Today →
-          </Link>
-        </div>
+        <LinkButton href="/dashboard" size="lg" className="mt-3">
+          Go to Today
+        </LinkButton>
       </div>
     );
   }
 
   return (
-    <div className="safe-area mx-auto flex min-h-screen max-w-md flex-col">
+    <div className="mx-auto flex min-h-screen w-full max-w-[440px] flex-col px-4 pb-[calc(16px+env(safe-area-inset-bottom,0px))] pt-[calc(14px+env(safe-area-inset-top,0px))]">
       {/* Top bar: phase progress + exit */}
       <div className="mb-6">
-        <div className="mb-2.5 flex items-center justify-between">
-          <span className="micro-label text-slate-400">
+        <div className="mb-2.5 flex items-center justify-between gap-2">
+          <span className="text-[12.5px] font-bold uppercase tracking-[0.08em] text-ink-3">
             {phase.label} · step {stageIndex + 1} of {plan.length}
           </span>
-          <Link href="/dashboard" className="text-xs font-medium text-slate-400">
-            Save &amp; exit
+          <Link href="/dashboard" className="-my-2.5 py-2.5 text-sm font-bold text-accent-ink">
+            Save and exit
           </Link>
         </div>
         <PhaseStepper currentPhase={phase.index} phaseProgress={phaseProgress} />
       </div>
 
-      {/* Stage card — keyed so the entrance animation replays each step */}
-      <div
-        key={stage.key}
-        className={`flex-1 ${dir === "back" ? "anim-slide-back" : "anim-slide-fwd"}`}
-      >
-        <div className="mb-5 text-center">
-          <div className="anim-pop mx-auto mb-3 flex h-20 w-20 items-center justify-center rounded-full bg-white text-brand-600 shadow-[0_8px_24px_-8px_rgba(35,133,240,0.55)] ring-1 ring-brand-100">
+      {/* Stage, keyed so the entrance animation replays each step */}
+      <div key={stage.key} className={`flex-1 ${dir === "back" ? "anim-slide-back" : "anim-slide-fwd"}`}>
+        <div className="mb-4 text-center">
+          <div className="anim-pop mx-auto mb-3 grid h-20 w-20 place-items-center rounded-full bg-accent-soft text-accent-ink">
             <Icon name={stage.icon} size={40} strokeWidth={1.6} />
           </div>
-          <h1 className="text-2xl font-bold text-slate-800">{stage.title}</h1>
+          <h1 className="text-[26px] font-extrabold leading-tight tracking-tight [text-wrap:balance]">{stage.title}</h1>
         </div>
 
-        <Card>
-          <p className="text-slate-600">{stage.body}</p>
+        <div className="grid gap-3.5">
+          <p className="text-[15.5px] leading-relaxed text-ink-2">{stage.body}</p>
           {stage.tip ? (
-            <p className="mt-3 flex items-start gap-2 rounded-xl bg-brand-50 px-3 py-2.5 text-sm text-brand-800">
-              <Icon name="bulb" size={15} className="mt-0.5 shrink-0" />
-              <span>{stage.tip}</span>
-            </p>
+            <Callout tone="accent" icon="bulb">
+              {stage.tip}
+            </Callout>
           ) : null}
           {stage.safety ? (
-            <p className="mt-3 flex items-start gap-2 rounded-xl bg-amber-50 px-3 py-2.5 text-sm text-amber-800">
-              <Icon name="alert-triangle" size={15} className="mt-0.5 shrink-0" />
-              <span>{stage.safety}</span>
-            </p>
+            <Callout tone="warn" icon="alert-triangle">
+              {stage.safety}
+            </Callout>
           ) : null}
 
-          {/* Stage-specific controls */}
-          <div className="mt-4">{renderStageBody()}</div>
+          {renderStageBody()}
 
-          {note ? (
-            <p className="mt-3 text-center text-sm text-slate-500">{note}</p>
-          ) : null}
-        </Card>
+          {note ? <p className="text-center text-[14.5px] font-semibold text-ink-2" role="status">{note}</p> : null}
+        </div>
       </div>
 
       {/* Bottom navigation */}
-      <div className="mt-5 flex gap-3">
+      <div className="mt-6 flex gap-2">
         {stageIndex > 0 ? (
-          <Button variant="secondary" onClick={() => go(-1)} className="flex-1">
+          <Button variant="line" size="lg" onClick={() => go(-1)} className="flex-1">
             Back
           </Button>
         ) : null}
@@ -440,42 +436,47 @@ export default function SetupWizard({
     switch (stage.key) {
       case "sanitizer":
         return (
-          <div className="grid grid-cols-2 gap-3">
-            {(["chlorine", "bromine"] as const).map((type) => (
-              <button
-                key={type}
-                onClick={() => setSanitizer(type)}
-                className={`rounded-2xl border-2 p-4 text-center transition ${
-                  sanitizer === type
-                    ? "border-brand-500 bg-brand-50"
-                    : "border-slate-200 bg-white"
-                }`}
-              >
-                <div className="text-3xl">
-                  {type === "chlorine" ? "💧" : "🟠"}
-                </div>
-                <div className="mt-1 font-semibold capitalize text-slate-800">
-                  {type}
-                </div>
-              </button>
-            ))}
-          </div>
+          <Card flush>
+            <div role="radiogroup" aria-label="Sanitiser">
+              {(["chlorine", "bromine"] as const).map((type) => (
+                <button
+                  key={type}
+                  type="button"
+                  role="radio"
+                  aria-checked={sanitizer === type}
+                  onClick={() => setSanitizer(type)}
+                  className="flex min-h-[60px] w-full items-center gap-3 px-3.5 py-3 text-left [&+&]:border-t [&+&]:border-line"
+                >
+                  <span className="grid h-10 w-10 shrink-0 place-items-center rounded-[10px] bg-accent-soft text-accent-ink">
+                    <Icon name={type === "chlorine" ? "droplet" : "bromine"} size={20} />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block font-bold">{type === "chlorine" ? "Chlorine" : "Bromine"}</span>
+                    <span className="block text-[13.5px] text-ink-2">
+                      {type === "chlorine" ? "Dichlor granules" : "Tablets or granules"}
+                    </span>
+                  </span>
+                  <span
+                    aria-hidden
+                    className={`grid h-6 w-6 shrink-0 place-items-center rounded-full border-2 ${
+                      sanitizer === type ? "border-accent bg-accent text-on-accent" : "border-ink-3"
+                    }`}
+                  >
+                    {sanitizer === type ? <Icon name="check" size={14} strokeWidth={3} /> : null}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </Card>
         );
 
       case "volume":
         return (
-          <label className="block">
-            <span className="mb-1 block text-sm font-medium text-slate-700">
-              Water volume (litres)
-            </span>
-            <input
-              type="number"
-              inputMode="decimal"
-              value={volume}
-              onChange={(e) => setVolume(e.target.value)}
-              className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-base shadow-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-200"
-            />
-          </label>
+          <Card flush>
+            <StepRow name="Litres">
+              <Stepper id="w-volume" label="litres" value={toNum(volume)} onChange={(v) => setVolume(toStr(v))} step={10} min={100} max={5000} unit="L" start={1000} />
+            </StepRow>
+          </Card>
         );
 
       case "fill":
@@ -483,7 +484,7 @@ export default function SetupWizard({
 
       case "test":
         return (
-          <div className="anim-stagger space-y-4">
+          <div className="anim-stagger grid gap-3.5">
             {testInputs}
             {hasAnyReading ? <WaterBalanceGauge metrics={gaugeMetrics} /> : null}
           </div>
@@ -497,8 +498,8 @@ export default function SetupWizard({
 
       case "sanitiser":
         return (
-          <div className="space-y-3">
-            <div className="anim-stagger space-y-3">
+          <div className="grid gap-3">
+            <div className="anim-stagger grid gap-3">
               {(stage.doses ?? []).map((d, i) => {
                 const m = /^([\d.]+)\s*(\S+)/.exec(d.amount);
                 const value = m ? Number(m[1]) : 0;
@@ -517,14 +518,12 @@ export default function SetupWizard({
             </div>
             {sanitizer === "chlorine" ? (
               <Button
-                variant="secondary"
+                variant="line"
+                block
                 disabled={busy}
-                onClick={() =>
-                  logDose("dichlor", commissioningChlorineGrams(Number(volume)))
-                }
-                className="w-full"
+                onClick={() => logDose("dichlor", commissioningChlorineGrams(Number(volume)))}
               >
-                Log this dose
+                I&apos;ve added it
               </Button>
             ) : null}
           </div>
@@ -532,18 +531,20 @@ export default function SetupWizard({
 
       case "wait":
         return (
-          <div className="space-y-4">
-            <div className="flex items-center justify-center py-1">
-              <div className="anim-pulse-soft text-brand-400">
+          <div className="grid gap-3.5">
+            <div className="flex justify-center py-1">
+              <div className="anim-pulse-soft text-accent-ink">
                 <Icon name="hourglass" size={40} strokeWidth={1.5} />
               </div>
             </div>
             {hasAnyReading ? <WaterBalanceGauge metrics={gaugeMetrics} /> : null}
-            <p className="text-center text-sm text-slate-500">
+            <p className="text-center text-[14.5px] text-ink-2">
               When you&apos;ve waited, test again to check it&apos;s safe.
             </p>
             {testInputs}
             <Button
+              block
+              size="lg"
               disabled={busy}
               onClick={async () => {
                 const c = await saveReading();
@@ -563,11 +564,10 @@ export default function SetupWizard({
                 setSafe(ok);
                 setNote(
                   ok
-                    ? "✓ Levels look safe — tap Continue."
-                    : "Not quite there yet — give it more time and test again.",
+                    ? "Levels look safe. Tap Continue."
+                    : "Not quite there yet. Give it more time and test again.",
                 );
               }}
-              className="w-full"
             >
               {busy ? "Checking…" : "Test again"}
             </Button>
@@ -576,14 +576,14 @@ export default function SetupWizard({
 
       case "final":
         return (
-          <div className="space-y-3 text-center text-sm text-slate-500">
+          <div className="grid gap-3">
             {hasAnyReading ? <WaterBalanceGauge metrics={gaugeMetrics} /> : null}
             {safe ? (
-              <p className="font-medium text-emerald-700">
-                ✓ Your water is safe and balanced.
-              </p>
+              <Callout tone="good" icon="check-circle">
+                Your water is safe and balanced.
+              </Callout>
             ) : (
-              <p>Finish once your last test showed safe levels.</p>
+              <p className="text-center text-[14.5px] text-ink-2">Finish once your last test showed safe levels.</p>
             )}
           </div>
         );
@@ -598,51 +598,48 @@ export default function SetupWizard({
   function renderDoseStage(order: number, label: string) {
     if (!calc) {
       return (
-        <p className="text-sm text-slate-500">
-          Do a test first (previous step) and your exact {label.toLowerCase()}{" "}
-          amount will appear here.
+        <p className="text-[14.5px] text-ink-2">
+          Do a test first (the step before) and the exact {label.toLowerCase()} amount appears here.
         </p>
       );
     }
     const rec = recForOrder(order);
     return (
-      <div className="space-y-3">
+      <div className="grid gap-3">
         {rec ? (
-          <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-            <p className="text-sm font-medium text-slate-800">{rec.label}</p>
+          <Card>
+            <p className="font-extrabold">{chemicalName(rec.chemical) ?? rec.label}</p>
             {rec.amountGrams != null ? (
-              <p className="text-lg font-bold text-slate-900">
-                {rec.amountGrams} g
-              </p>
+              <p className="mt-1 text-[32px] font-extrabold leading-tight tabular-nums">{rec.amountGrams} g</p>
             ) : null}
-            <p className="mt-1 text-xs text-slate-500">{rec.instructions}</p>
+            <p className="mt-1 text-[13.5px] leading-snug text-ink-2">{rec.instructions}</p>
             {rec.chemical && rec.amountGrams != null ? (
               <Button
-                variant="secondary"
+                variant="line"
+                size="sm"
                 disabled={busy}
-                onClick={() =>
-                  logDose(rec.chemical as string, rec.amountGrams as number)
-                }
-                className="mt-2 text-xs"
+                onClick={() => logDose(rec.chemical as string, rec.amountGrams as number)}
+                className="mt-3"
               >
-                Log this dose
+                I&apos;ve added it
               </Button>
             ) : null}
-          </div>
+          </Card>
         ) : (
-          <p className="rounded-xl bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
-            ✓ {label} is already in range — nothing to add.
-          </p>
+          <Callout tone="good" icon="check-circle">
+            {label} is already in range. Nothing to add.
+          </Callout>
         )}
 
-        <details className="text-sm">
-          <summary className="cursor-pointer font-medium text-brand-600">
-            Added it? Retest
+        <details className="group">
+          <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 font-bold text-accent-ink">
+            <Icon name="chevron" size={16} className="-rotate-90 transition-transform group-open:rotate-0" />
+            Added it? Test again
           </summary>
-          <div className="mt-3 space-y-3">
+          <div className="mt-2 grid gap-3">
             {testInputs}
-            <Button disabled={busy} onClick={saveReading} className="w-full">
-              {busy ? "Saving…" : "Save retest"}
+            <Button block disabled={busy} onClick={saveReading}>
+              {busy ? "Saving…" : "Save the new test"}
             </Button>
           </div>
         </details>
@@ -651,44 +648,32 @@ export default function SetupWizard({
   }
 
   function renderPrimaryButton() {
+    const cls = "flex-1";
     // The final stage finishes; the wait stage only advances once safe.
     if (stage.key === "final") {
       return (
-        <Button onClick={finish} disabled={busy || !safe} className="flex-1">
-          {busy ? "Finishing…" : "Finish setup 🎉"}
+        <Button size="lg" onClick={finish} disabled={busy || !safe} className={cls}>
+          {busy ? "Finishing…" : "Finish setup"}
         </Button>
       );
     }
     if (stage.key === "wait") {
       return (
-        <Button onClick={() => go(1)} disabled={!safe} className="flex-1">
+        <Button size="lg" onClick={() => go(1)} disabled={!safe} className={cls}>
           Continue
         </Button>
       );
     }
-    if (stage.key === "volume") {
+    if (stage.key === "volume" || stage.key === "sanitizer") {
       return (
         <Button
-          disabled={busy || !(Number(volume) > 0)}
+          size="lg"
+          disabled={busy || (stage.key === "volume" && !(Number(volume) > 0))}
           onClick={async () => {
             const ok = await saveSettings();
             if (ok) go(1);
           }}
-          className="flex-1"
-        >
-          {busy ? "Saving…" : "Continue"}
-        </Button>
-      );
-    }
-    if (stage.key === "sanitizer") {
-      return (
-        <Button
-          disabled={busy}
-          onClick={async () => {
-            const ok = await saveSettings();
-            if (ok) go(1);
-          }}
-          className="flex-1"
+          className={cls}
         >
           {busy ? "Saving…" : "Continue"}
         </Button>
@@ -697,48 +682,31 @@ export default function SetupWizard({
     if (stage.key === "test") {
       return (
         <Button
+          size="lg"
           disabled={busy}
           onClick={async () => {
             const c = await saveReading();
             if (c) go(1);
           }}
-          className="flex-1"
+          className={cls}
         >
-          {busy ? "Saving…" : "Save & continue"}
+          {busy ? "Saving…" : "Continue"}
         </Button>
       );
     }
     return (
-      <Button onClick={() => go(1)} className="flex-1">
+      <Button size="lg" onClick={() => go(1)} className={cls}>
         {stageIndex === 0 ? "Let's go" : "Next"}
       </Button>
     );
   }
 }
 
-function LabelledInput({
-  label,
-  value,
-  onChange,
-  placeholder,
-}: {
-  label: string;
-  value: string;
-  onChange: (v: string) => void;
-  placeholder?: string;
-}) {
+function StepRow({ name, children }: { name: string; children: React.ReactNode }) {
   return (
-    <label className="block">
-      <span className="mb-1 block text-xs text-slate-500">{label}</span>
-      <input
-        type="number"
-        inputMode="decimal"
-        step="0.1"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-        className="w-full rounded-lg border border-slate-300 px-2 py-2 text-base outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-200"
-      />
-    </label>
+    <div className="flex min-h-[64px] items-center justify-between gap-3 px-3.5 py-2 [&+&]:border-t [&+&]:border-line">
+      <p className="min-w-0 font-bold">{name}</p>
+      {children}
+    </div>
   );
 }

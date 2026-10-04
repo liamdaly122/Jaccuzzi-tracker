@@ -38,14 +38,14 @@ function Scoop({ fill }: { fill: number }) {
       </defs>
       {/* Granule fill */}
       <g clipPath="url(#scoop-bowl)">
-        <rect x="0" y={levelY} width="64" height="48" fill="#93d8ff" />
-        <rect x="0" y={levelY} width="64" height="3" fill="#60c1ff" />
+        <rect x="0" y={levelY} width="64" height="48" className="fill-accent/25" />
+        <rect x="0" y={levelY} width="64" height="3" className="fill-accent/60" />
       </g>
       {/* Bowl outline */}
       <path
         d="M10 14h34a4 4 0 0 1 4 4v8a14 14 0 0 1-14 14H20A14 14 0 0 1 6 26v-8a4 4 0 0 1 4-4Z"
         fill="none"
-        stroke="#2385f0"
+        className="stroke-accent"
         strokeWidth="2.2"
         strokeLinejoin="round"
       />
@@ -53,7 +53,7 @@ function Scoop({ fill }: { fill: number }) {
       <path
         d="M48 20h7a3 3 0 0 1 3 3v3"
         fill="none"
-        stroke="#2385f0"
+        className="stroke-accent"
         strokeWidth="2.2"
         strokeLinecap="round"
       />
@@ -73,8 +73,8 @@ export default function DoseCard({
   const tsp = showTeaspoons ? gramsToTeaspoons(amount) : 0;
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-gradient-to-br from-white to-slate-50 p-4 shadow-sm">
-      <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+    <div className="rounded-card border border-line bg-surface p-4">
+      <p className="text-[12.5px] font-bold uppercase tracking-[0.06em] text-ink-3">
         {label}
       </p>
 
@@ -82,13 +82,13 @@ export default function DoseCard({
         <Scoop fill={fill} />
         <div className="min-w-0">
           <p className="flex items-baseline gap-1.5">
-            <span className="num-tabular text-4xl font-bold leading-none text-slate-900">
+            <span className="num-tabular text-4xl font-extrabold leading-none">
               {amount}
             </span>
-            <span className="text-lg font-semibold text-slate-500">{unit}</span>
+            <span className="text-lg font-bold text-ink-3">{unit}</span>
           </p>
           {showTeaspoons && tsp > 0 ? (
-            <p className="mt-1 text-sm text-slate-600">
+            <p className="mt-1 text-sm text-ink-2">
               ≈ <span className="num-tabular font-semibold">{tsp}</span>{" "}
               {tsp === 1 ? "teaspoon" : "teaspoons"}
             </p>
@@ -97,13 +97,12 @@ export default function DoseCard({
       </div>
 
       {instructions ? (
-        <p className="mt-3 text-sm text-slate-600">{instructions}</p>
+        <p className="mt-3 text-sm text-ink-2">{instructions}</p>
       ) : null}
 
-      <p className="mt-3 flex items-start gap-1.5 text-xs text-slate-500">
-        <Icon name="bulb" size={13} className="mt-px shrink-0" />
-        Always check the amount against your product&apos;s label — pack
-        strengths vary.
+      <p className="mt-3 flex items-start gap-1.5 text-[13px] text-ink-3">
+        <Icon name="bulb" size={14} className="mt-px shrink-0" />
+        Check the amount against your product&apos;s label: pack strengths vary.
       </p>
 
       {children ? <div className="mt-3">{children}</div> : null}

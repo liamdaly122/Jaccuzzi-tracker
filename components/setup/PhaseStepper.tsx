@@ -32,22 +32,18 @@ export default function PhaseStepper({
             className="flex-1"
             aria-current={active ? "step" : undefined}
           >
-            <div className="h-1.5 overflow-hidden rounded-full bg-slate-200">
+            <div className="h-1.5 overflow-hidden rounded-full bg-track">
               <div
-                className="h-full rounded-full bg-brand-500 transition-all duration-500 ease-out"
+                className="h-full rounded-full bg-accent transition-all duration-500 ease-out"
                 style={{ width: `${fill}%` }}
               />
             </div>
             <p
-              className={`mt-1.5 flex items-center gap-1 text-[11px] font-medium ${
-                done
-                  ? "text-emerald-700"
-                  : active
-                    ? "text-brand-700"
-                    : "text-slate-400"
+              className={`mt-1.5 flex items-center gap-1 text-[12px] font-bold ${
+                done ? "text-good-ink" : active ? "text-accent-ink" : "text-ink-3"
               }`}
             >
-              {done ? <Icon name="check-circle" size={11} /> : null}
+              {done ? <Icon name="check-circle" size={12} /> : null}
               {phase}
             </p>
           </li>

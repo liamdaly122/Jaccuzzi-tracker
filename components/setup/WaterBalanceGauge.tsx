@@ -13,16 +13,7 @@
 import Icon from "@/components/Icon";
 import type { IconName } from "@/lib/icons";
 
-// Ink / surface tokens — text never wears the status colour.
-const INK = "#334155"; // slate-700
-const MUTED = "#94a3b8"; // slate-400
-const TRACK = "#e2e8f0"; // slate-200
-// Fixed status palette (never themed).
-const GOOD = "#0ca30c";
-const WARNING = "#fab219";
-const CRITICAL = "#d03b3b";
-const BAND = "rgba(12,163,12,0.14)";
-const BAND_EDGE = "rgba(12,163,12,0.40)";
+// Colours come from the theme tokens, so the gauge follows light and dark.
 
 export interface GaugeMetric {
   label: string;
@@ -37,38 +28,38 @@ export interface GaugeMetric {
 }
 
 function statusOf(m: GaugeMetric): {
-  tone: string;
+  fill: string;
   label: string;
   icon: IconName;
   textClass: string;
 } {
   if (m.value === null) {
     return {
-      tone: MUTED,
+      fill: "fill-ink-3",
       label: "Not tested",
       icon: "search",
-      textClass: "text-slate-400",
+      textClass: "text-ink-3",
     };
   }
   if (m.value < m.min)
     return {
-      tone: m.value < m.floor + (m.min - m.floor) / 3 ? CRITICAL : WARNING,
+      fill: m.value < m.floor + (m.min - m.floor) / 3 ? "fill-bad" : "fill-warn",
       label: "Too low",
       icon: "alert-triangle",
-      textClass: "text-amber-700",
+      textClass: "text-warn-ink",
     };
   if (m.value > m.max)
     return {
-      tone: m.value > m.max + (m.ceiling - m.max) / 2 ? CRITICAL : WARNING,
+      fill: m.value > m.max + (m.ceiling - m.max) / 2 ? "fill-bad" : "fill-warn",
       label: "Too high",
       icon: "alert-triangle",
-      textClass: "text-amber-700",
+      textClass: "text-warn-ink",
     };
   return {
-    tone: GOOD,
+    fill: "fill-good",
     label: "In range",
     icon: "check-circle",
-    textClass: "text-emerald-700",
+    textClass: "text-good-ink",
   };
 }
 
@@ -77,7 +68,7 @@ function GaugeRow({ metric }: { metric: GaugeMetric }) {
   const status = statusOf(metric);
 
   const W = 300;
-  const H = 30;
+  const H = 34;
   const padX = 6;
   const trackY = 15;
   const plotW = W - padX * 2;
@@ -93,10 +84,10 @@ function GaugeRow({ metric }: { metric: GaugeMetric }) {
   return (
     <div>
       <div className="mb-0.5 flex items-baseline justify-between">
-        <span className="text-xs font-medium uppercase tracking-wide text-slate-500">
+        <span className="text-[12.5px] font-bold uppercase tracking-[0.06em] text-ink-3">
           {label}
         </span>
-        <span className="num-tabular text-sm font-semibold text-slate-800">
+        <span className="num-tabular text-[15px] font-extrabold">
           {value === null ? "—" : `${fmt(value)}${unit ? ` ${unit}` : ""}`}
         </span>
       </div>
@@ -116,7 +107,7 @@ function GaugeRow({ metric }: { metric: GaugeMetric }) {
           width={plotW}
           height={6}
           rx={3}
-          fill={TRACK}
+          className="fill-track"
         />
         {/* Ideal zone */}
         <rect
@@ -125,21 +116,21 @@ function GaugeRow({ metric }: { metric: GaugeMetric }) {
           width={bandW}
           height={12}
           rx={3}
-          fill={BAND}
+          className="fill-good/15"
         />
         <line
           x1={bandX}
           x2={bandX}
           y1={trackY - 7}
           y2={trackY + 7}
-          stroke={BAND_EDGE}
+          className="stroke-good/40"
         />
         <line
           x1={bandX + bandW}
           x2={bandX + bandW}
           y1={trackY - 7}
           y2={trackY + 7}
-          stroke={BAND_EDGE}
+          className="stroke-good/40"
         />
 
         {/* Marker — 2px surface ring so it reads over the band */}
@@ -148,25 +139,23 @@ function GaugeRow({ metric }: { metric: GaugeMetric }) {
             cx={x(value)}
             cy={trackY}
             r={6}
-            fill={status.tone}
-            stroke="#ffffff"
             strokeWidth={2}
-            className="anim-marker"
+            className={`anim-marker stroke-surface ${status.fill}`}
           />
         ) : null}
 
         {/* Range ticks */}
-        <text x={padX} y={H - 1} fontSize={9} fill={MUTED}>
+        <text x={padX} y={H - 1} fontSize={11} className="fill-ink-3">
           {fmt(floor)}
         </text>
-        <text x={padX + plotW} y={H - 1} fontSize={9} fill={MUTED} textAnchor="end">
+        <text x={padX + plotW} y={H - 1} fontSize={11} className="fill-ink-3" textAnchor="end">
           {fmt(ceiling)}
         </text>
         <text
           x={bandX + bandW / 2}
           y={H - 1}
-          fontSize={9}
-          fill={INK}
+          fontSize={11}
+          className="fill-ink-2"
           textAnchor="middle"
         >
           ideal {fmt(min)}–{fmt(max)}
@@ -175,7 +164,7 @@ function GaugeRow({ metric }: { metric: GaugeMetric }) {
 
       {/* Status never rides on colour alone: icon + word, in ink-safe text. */}
       <p
-        className={`mt-0.5 flex items-center gap-1 text-xs font-medium ${status.textClass}`}
+        className={`mt-0.5 flex items-center gap-1 text-[13px] font-bold ${status.textClass}`}
       >
         <Icon name={status.icon} size={13} />
         {status.label}
@@ -192,8 +181,8 @@ export default function WaterBalanceGauge({
   title?: string;
 }) {
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-      <h3 className="mb-3 text-sm font-semibold text-slate-800">{title}</h3>
+    <div className="rounded-card border border-line bg-surface p-4">
+      <h3 className="mb-3 text-[15px] font-extrabold">{title}</h3>
       <div className="space-y-3.5">
         {metrics.map((m) => (
           <GaugeRow key={m.label} metric={m} />

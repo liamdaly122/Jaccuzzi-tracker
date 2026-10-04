@@ -20,7 +20,7 @@ export default async function SetupPage() {
     }
   } catch (err) {
     return (
-      <div className="p-4">
+      <div className="mx-auto max-w-[440px] p-4">
         <SetupNeeded
           message={err instanceof Error ? err.message : "Unknown error"}
         />
