@@ -50,8 +50,9 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  // Run on everything EXCEPT Next internals and static asset files.
+  // Run on everything EXCEPT Next internals and static asset files. The home
+  // screen icons must be public: phones fetch them without the login cookie.
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|manifest.webmanifest|icon.png|apple-icon.png|icon.svg|robots.txt).*)",
+    "/((?!_next/static|_next/image|favicon.ico|manifest.webmanifest|icon.png|apple-icon.png|icon.svg|app-icon-|robots.txt).*)",
   ],
 };

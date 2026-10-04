@@ -3,7 +3,7 @@
 import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button, Callout, Field, inputClass } from "@/components/ui";
-import Icon from "@/components/Icon";
+import Image from "next/image";
 
 function LoginForm() {
   const router = useRouter();
@@ -42,9 +42,14 @@ function LoginForm() {
     <main className="grid min-h-screen place-items-center px-4 py-10">
       <div className="w-full max-w-[380px]">
         <div className="mb-6 text-center">
-          <div className="mx-auto mb-3.5 grid h-16 w-16 place-items-center rounded-[18px] bg-accent text-on-accent">
-            <Icon name="bath" size={34} />
-          </div>
+          <Image
+            src="/app-icon-192.png"
+            alt=""
+            width={64}
+            height={64}
+            priority
+            className="mx-auto mb-3.5 rounded-[15px]"
+          />
           <h1 className="text-[28px] font-extrabold tracking-tight">Hot Tub Tracker</h1>
           <p className="mt-1 text-[15px] text-ink-2">Enter your passcode to carry on.</p>
         </div>

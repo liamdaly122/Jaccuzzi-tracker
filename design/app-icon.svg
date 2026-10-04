@@ -1,0 +1,30 @@
+<!-- The app icon: a hot tub with steam rising, in the app's teal. The PNGs in
+     public/ and app/ are drawn from this at 512, 192 and 180 px (plus a
+     rounded 192 px browser-tab icon). Everything sits inside the middle 80%
+     so Android's circle crop never clips it. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#17A097"/><stop offset="1" stop-color="#0A5754"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.25" cy="0.12" r="0.9">
+      <stop offset="0" stop-color="#fff" stop-opacity=".22"/><stop offset=".6" stop-color="#fff" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="tub" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FFFFFF"/><stop offset="1" stop-color="#D3ECE8"/>
+    </linearGradient>
+    <linearGradient id="water" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#8BE7DD"/><stop offset="1" stop-color="#36B3A8"/>
+    </linearGradient>
+  </defs>
+  <rect width="1024" height="1024" fill="url(#bg)"/>
+  <rect width="1024" height="1024" fill="url(#glow)"/>
+  <g fill="none" stroke="#fff" stroke-width="42" stroke-linecap="round">
+    <path d="M402 500 C356 462 448 424 402 380 S356 300 402 262" opacity=".9"/>
+    <path d="M512 486 C466 444 558 400 512 352 S466 262 512 216"/>
+    <path d="M622 500 C576 462 668 424 622 380 S576 300 622 262" opacity=".9"/>
+  </g>
+  <path d="M252 610 V676 C252 760 368 806 512 806 C656 806 772 760 772 676 V610 Z" fill="url(#tub)"/>
+  <ellipse cx="512" cy="610" rx="260" ry="74" fill="#FFFFFF"/>
+  <ellipse cx="512" cy="614" rx="214" ry="50" fill="url(#water)"/>
+</svg>
