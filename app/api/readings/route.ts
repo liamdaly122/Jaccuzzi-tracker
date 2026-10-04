@@ -93,10 +93,13 @@ export async function POST(request: NextRequest) {
         getTasks().catch(() => []),
       ]);
       const drainTask = tasks.find((t) => t.task_key === "drain_refill");
+      // Same assumed temperature as the Water tab: their soak target.
       balance = lsiSnapshot(
         history,
         probeRows,
         drainTask?.last_completed_at ?? null,
+        new Date(),
+        config.targetRanges.tempTarget,
       );
     } catch {
       balance = null;

@@ -171,6 +171,13 @@ const DOSE_NAME: Record<string, string> = {
   mps_shock: "shock",
 };
 
+/** "Alkalinity increaser", "Dichlor": what's on the tub, for a heading. */
+export function chemicalName(chemical: string | null): string | null {
+  const name = chemical ? DOSE_NAME[chemical] : undefined;
+  if (!name) return null;
+  return name.startsWith("pH") ? name : name.charAt(0).toUpperCase() + name.slice(1);
+}
+
 function doseTitle(rec: Recommendation): string {
   const name = rec.chemical ? DOSE_NAME[rec.chemical] : null;
   if (!name) return rec.label;

@@ -1,6 +1,13 @@
 "use client";
 
-import { useState } from "react";
+// =============================================================================
+//  components/ReadingForm.tsx
+//  Test the water. Fill from the probe or a photo of the strip, or step each
+//  number in; "See what to add" saves the test and turns into the results:
+//  what to add, in order, each with a button to log it once it's in.
+// =============================================================================
+
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import type {
   CalculationResult,
@@ -9,10 +16,12 @@ import type {
   TargetRanges,
 } from "@/lib/chemistry";
 import type { LsiSnapshot } from "@/lib/balance";
-import { Button, Card, Field, inputClass } from "./ui";
+import { Button, Callout, Card, inputClass } from "./ui";
+import PageHeader from "./PageHeader";
+import Stepper from "./Stepper";
 import RecommendationList from "./RecommendationList";
 import ScanStripButton from "./ScanStripButton";
-import IopoolButton from "./IopoolButton";
+import IopoolButton, { SourceLine, type SourceMessage } from "./IopoolButton";
 
 interface Props {
   sanitizerType: SanitizerType;
@@ -22,25 +31,40 @@ interface Props {
   iopoolEnabled?: boolean;
 }
 
-// A test-strip usually gives colour bands, so we present the ideal band next to
-// each field to help the user read their strip.
+type Num = number | null;
+
+function FieldRow({ name, hint, children }: { name: string; hint: string; children: React.ReactNode }) {
+  return (
+    <div className="flex min-h-[68px] items-center justify-between gap-3 px-3.5 py-2.5 [&+&]:border-t [&+&]:border-line">
+      <div className="min-w-0">
+        <p className="font-bold leading-snug">{name}</p>
+        <p className="text-[13px] leading-snug text-ink-3">{hint}</p>
+      </div>
+      {children}
+    </div>
+  );
+}
+
 export default function ReadingForm({
   sanitizerType,
-  targetRanges,
+  targetRanges: r,
   scanEnabled = false,
   sanitizerUnit = "ppm",
   iopoolEnabled = false,
 }: Props) {
   const orpMode = sanitizerUnit === "orp";
+  const chlorine = sanitizerType === "chlorine";
   const router = useRouter();
-  const [ph, setPh] = useState("");
-  const [ta, setTa] = useState("");
-  const [sanitizer, setSanitizer] = useState("");
-  const [calcium, setCalcium] = useState("");
-  const [cya, setCya] = useState("");
-  const [orp, setOrp] = useState("");
+  const [ph, setPh] = useState<Num>(null);
+  const [ta, setTa] = useState<Num>(null);
+  const [sanitizer, setSanitizer] = useState<Num>(null);
+  const [calcium, setCalcium] = useState<Num>(null);
+  const [cya, setCya] = useState<Num>(null);
+  const [orp, setOrp] = useState<Num>(null);
   const [isFreshFill, setIsFreshFill] = useState(false);
   const [notes, setNotes] = useState("");
+  const [showNotes, setShowNotes] = useState(false);
+  const [source, setSource] = useState<SourceMessage | null>(null);
 
   const [result, setResult] = useState<CalculationResult | null>(null);
   const [readingId, setReadingId] = useState<number | null>(null);
@@ -48,270 +72,172 @@ export default function ReadingForm({
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const num = (s: string): number | null =>
-    s.trim() === "" ? null : Number(s);
+  // The "needed" message goes as soon as both are filled in.
+  useEffect(() => {
+    if (ph !== null && ta !== null) setError(null);
+  }, [ph, ta]);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
-
-    const phVal = num(ph);
-    const taVal = num(ta);
-    if (phVal === null || taVal === null) {
-      setError("Please enter at least pH and Total Alkalinity.");
+    if (ph === null || ta === null) {
+      setError("pH and alkalinity are needed. The rest are optional.");
       return;
     }
 
     setLoading(true);
-    const payload = {
-      ph: phVal,
-      totalAlkalinityPpm: taVal,
-      freeChlorinePpm: sanitizerType === "chlorine" ? num(sanitizer) : null,
-      brominePpm: sanitizerType === "bromine" ? num(sanitizer) : null,
-      calciumHardnessPpm: num(calcium),
-      cyanuricAcidPpm: num(cya),
-      orpMv: num(orp),
-      isFreshFill,
-      notes: notes.trim() || null,
-    };
-
     try {
       const res = await fetch("/api/readings", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({
+          ph,
+          totalAlkalinityPpm: ta,
+          freeChlorinePpm: chlorine ? sanitizer : null,
+          brominePpm: chlorine ? null : sanitizer,
+          calciumHardnessPpm: calcium,
+          cyanuricAcidPpm: cya,
+          orpMv: orp,
+          isFreshFill,
+          notes: notes.trim() || null,
+        }),
       });
       const data = await res.json();
       if (res.ok) {
         setResult(data.calculation as CalculationResult);
         setReadingId(data.reading?.id ?? null);
         setBalance((data.balance as LsiSnapshot | null) ?? null);
-        router.refresh(); // keep dashboard/history fresh
+        window.scrollTo({ top: 0 });
+        router.refresh();
       } else {
-        setError(data.error || "Could not save the reading.");
+        setError(data.error || "That didn't save. Try again in a moment.");
       }
     } catch {
-      setError("Something went wrong. Please try again.");
+      setError("That didn't save. Check your connection and try again.");
     } finally {
       setLoading(false);
     }
   }
 
-  function reset() {
-    setResult(null);
-    setReadingId(null);
-    setBalance(null);
-    setPh("");
-    setTa("");
-    setSanitizer("");
-    setCalcium("");
-    setCya("");
-    setOrp("");
-    setIsFreshFill(false);
-    setNotes("");
-  }
-
   if (result) {
     return (
-      <div className="space-y-4">
-        <RecommendationList
-          result={result}
-          readingId={readingId}
-          balance={balance}
-        />
-        <div className="flex gap-2">
-          <Button variant="secondary" onClick={reset} className="flex-1">
-            Log another reading
-          </Button>
-          <Button
-            variant="ghost"
-            onClick={() => router.push("/dashboard")}
-            className="flex-1"
-          >
-            Back to Today
-          </Button>
-        </div>
-      </div>
+      <RecommendationList
+        result={result}
+        readingId={readingId}
+        balance={balance}
+        sanitizerType={sanitizerType}
+        sanitiserTested={sanitizer !== null || orp !== null}
+        onChange={() => {
+          setResult(null);
+          window.scrollTo({ top: 0 });
+        }}
+      />
     );
   }
 
-  const sanitizerLabel =
-    sanitizerType === "chlorine" ? "Free chlorine" : "Bromine";
-  const sanitizerRange =
-    sanitizerType === "chlorine"
-      ? `${targetRanges.fcMin}–${targetRanges.fcMax} ppm`
-      : `${targetRanges.brMin}–${targetRanges.brMax} ppm`;
+  const sanName = chlorine ? "Free chlorine" : "Bromine";
+  const sanRange = chlorine ? `${r.fcMin}–${r.fcMax}` : `${r.brMin}–${r.brMax}`;
 
   return (
-    <form onSubmit={onSubmit} className="space-y-4">
-      <Card>
-        <p className="mb-4 text-sm text-slate-500">
-          Dip your test strip, then type in what it reads. The app will work out
-          exactly what to add.
-        </p>
+    <form onSubmit={onSubmit} className="grid gap-[18px]">
+      <PageHeader title="Test the water" back={{ href: "/dashboard", label: "Back to Today" }} />
 
-        {iopoolEnabled ? (
-          <div className="mb-3">
-            <IopoolButton
-              onValues={(pool) => {
-                const m = pool.measure;
-                if (m.ph != null) setPh(String(m.ph));
-                if (m.orpMv != null) setOrp(String(m.orpMv));
-              }}
-            />
-          </div>
-        ) : null}
-
-        {scanEnabled ? (
-          <div className="mb-4">
-            <ScanStripButton
-              sanitizerType={sanitizerType}
-              onValues={(v) => {
-                const san =
-                  sanitizerType === "chlorine"
-                    ? v.freeChlorinePpm
-                    : v.brominePpm;
-                if (v.ph != null) setPh(String(v.ph));
-                if (v.totalAlkalinityPpm != null)
-                  setTa(String(v.totalAlkalinityPpm));
-                if (san != null) setSanitizer(String(san));
-                if (v.calciumHardnessPpm != null)
-                  setCalcium(String(v.calciumHardnessPpm));
-                if (v.cyanuricAcidPpm != null)
-                  setCya(String(v.cyanuricAcidPpm));
-              }}
-            />
-            <p className="mt-2 text-center text-xs text-slate-400">
-              or type the readings in below
-            </p>
-          </div>
-        ) : null}
-
-        <div className="space-y-4">
-          <Field
-            label="pH"
-            hint={`Aim for ${targetRanges.phIdealMin}–${targetRanges.phIdealMax}`}
-          >
-            <input
-              type="number"
-              inputMode="decimal"
-              step="0.1"
-              value={ph}
-              onChange={(e) => setPh(e.target.value)}
-              className={inputClass}
-              placeholder="e.g. 7.5"
-            />
-          </Field>
-
-          <Field
-            label="Total Alkalinity (ppm)"
-            hint={`Aim for ${targetRanges.taMin}–${targetRanges.taMax}`}
-          >
-            <input
-              type="number"
-              inputMode="decimal"
-              value={ta}
-              onChange={(e) => setTa(e.target.value)}
-              className={inputClass}
-              placeholder="e.g. 100"
-            />
-          </Field>
-
-          {orpMode ? (
-            <Field
-              label="ORP / disinfection potential (mV)"
-              hint={`Aim for ${targetRanges.orpMin ?? 650}–${targetRanges.orpMax ?? 750} mV. This is your probe's main reading.`}
-            >
-              <input
-                type="number"
-                inputMode="decimal"
-                value={orp}
-                onChange={(e) => setOrp(e.target.value)}
-                className={inputClass}
-                placeholder="e.g. 700"
+      {scanEnabled || iopoolEnabled ? (
+        <div>
+          <div className="flex flex-wrap gap-2">
+            {scanEnabled ? (
+              <ScanStripButton
+                className="min-w-[150px] flex-1"
+                sanitizerType={sanitizerType}
+                onMessage={setSource}
+                onValues={(v) => {
+                  const san = chlorine ? v.freeChlorinePpm : v.brominePpm;
+                  if (v.ph != null) setPh(v.ph);
+                  if (v.totalAlkalinityPpm != null) setTa(v.totalAlkalinityPpm);
+                  if (san != null) setSanitizer(san);
+                  if (v.calciumHardnessPpm != null) setCalcium(v.calciumHardnessPpm);
+                  if (v.cyanuricAcidPpm != null) setCya(v.cyanuricAcidPpm);
+                }}
               />
-            </Field>
-          ) : null}
-
-          <Field
-            label={`${sanitizerLabel} (ppm)${orpMode ? " — optional" : ""}`}
-            hint={
-              orpMode
-                ? "Only if you also did a strip. Adding it lets me work out an exact dose."
-                : `Aim for ${sanitizerRange}`
-            }
-          >
-            <input
-              type="number"
-              inputMode="decimal"
-              step="0.1"
-              value={sanitizer}
-              onChange={(e) => setSanitizer(e.target.value)}
-              className={inputClass}
-              placeholder="e.g. 3"
-            />
-          </Field>
-
-          <Field
-            label="Calcium hardness (ppm) — optional"
-            hint="Leave blank if your strip doesn't test this"
-          >
-            <input
-              type="number"
-              inputMode="decimal"
-              value={calcium}
-              onChange={(e) => setCalcium(e.target.value)}
-              className={inputClass}
-              placeholder="optional"
-            />
-          </Field>
-
-          <Field
-            label="Stabiliser / cyanuric acid (ppm) — optional"
-            hint={`Aim for ${targetRanges.cyaMin ?? 20}–${targetRanges.cyaMax ?? 50}. Leave blank if your strip doesn't test it. Only needed every few weeks.`}
-          >
-            <input
-              type="number"
-              inputMode="decimal"
-              value={cya}
-              onChange={(e) => setCya(e.target.value)}
-              className={inputClass}
-              placeholder="optional"
-            />
-          </Field>
-
-          <label className="flex items-center gap-3 rounded-xl border border-slate-200 p-3">
-            <input
-              type="checkbox"
-              checked={isFreshFill}
-              onChange={(e) => setIsFreshFill(e.target.checked)}
-              className="h-5 w-5 rounded"
-            />
-            <span className="text-sm text-slate-700">
-              This is a fresh fill (I just refilled the tub)
-            </span>
-          </label>
-
-          <Field label="Notes — optional">
-            <textarea
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              className={inputClass}
-              rows={2}
-              placeholder="Anything worth remembering"
-            />
-          </Field>
+            ) : null}
+            {iopoolEnabled ? (
+              <IopoolButton
+                className="min-w-[150px] flex-1"
+                onMessage={setSource}
+                onValues={(pool) => {
+                  const m = pool.measure;
+                  if (m.ph != null) setPh(m.ph);
+                  if (m.orpMv != null) setOrp(m.orpMv);
+                }}
+              />
+            ) : null}
+          </div>
+          {source ? <SourceLine message={source} /> : null}
         </div>
-      </Card>
-
-      {error ? (
-        <p className="rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700">
-          {error}
-        </p>
       ) : null}
 
-      <Button type="submit" disabled={loading} className="w-full">
-        {loading ? "Working it out…" : "Get my recommendations"}
+      <Card flush>
+        <FieldRow name="pH" hint={`Aim ${r.phIdealMin}–${r.phIdealMax}`}>
+          <Stepper id="t-ph" label="pH" value={ph} onChange={setPh} step={0.1} min={6} max={9} decimals={1} start={7.5} />
+        </FieldRow>
+        <FieldRow name="Alkalinity" hint={`Aim ${r.taMin}–${r.taMax}`}>
+          <Stepper id="t-ta" label="alkalinity" value={ta} onChange={setTa} step={10} min={0} max={400} unit="ppm" start={100} />
+        </FieldRow>
+        {orpMode ? (
+          <FieldRow name="ORP" hint={`Aim ${r.orpMin}–${r.orpMax}, from the probe`}>
+            <Stepper id="t-orp" label="ORP" value={orp} onChange={setOrp} step={10} min={0} max={1200} unit="mV" start={700} />
+          </FieldRow>
+        ) : null}
+        <FieldRow name={sanName} hint={orpMode ? "Optional, from a strip" : `Aim ${sanRange}`}>
+          <Stepper id="t-san" label={sanName.toLowerCase()} value={sanitizer} onChange={setSanitizer} step={0.5} min={0} max={20} decimals={1} unit="ppm" start={3} />
+        </FieldRow>
+        <FieldRow name="Calcium" hint="Optional">
+          <Stepper id="t-ch" label="calcium" value={calcium} onChange={setCalcium} step={25} min={0} max={1000} unit="ppm" start={150} />
+        </FieldRow>
+        <FieldRow name="Stabiliser" hint="Optional, every few weeks">
+          <Stepper id="t-cya" label="stabiliser" value={cya} onChange={setCya} step={10} min={0} max={300} unit="ppm" start={30} />
+        </FieldRow>
+      </Card>
+
+      <Card flush>
+        <label className="flex min-h-[60px] cursor-pointer items-center gap-3 px-3.5 py-3">
+          <input
+            type="checkbox"
+            checked={isFreshFill}
+            onChange={(e) => setIsFreshFill(e.target.checked)}
+            className="h-6 w-6 shrink-0 accent-accent"
+          />
+          <span className="min-w-0">
+            <span className="block font-bold">I&apos;ve just refilled it</span>
+            <span className="block text-[13px] text-ink-3">Fresh water gets a starting dose</span>
+          </span>
+        </label>
+      </Card>
+
+      {showNotes ? (
+        <textarea
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          className={inputClass}
+          rows={2}
+          aria-label="Note"
+          placeholder="Anything worth remembering"
+          autoFocus
+        />
+      ) : (
+        <Button variant="text" className="justify-self-start" onClick={() => setShowNotes(true)}>
+          Add a note
+        </Button>
+      )}
+
+      {error ? (
+        <Callout tone="bad" icon="alert-triangle">
+          {error}
+        </Callout>
+      ) : null}
+
+      <Button type="submit" size="lg" block disabled={loading}>
+        {loading ? "Working it out…" : "See what to add"}
       </Button>
     </form>
   );

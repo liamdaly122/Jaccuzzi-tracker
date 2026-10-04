@@ -19,6 +19,7 @@ export default function Stepper({
   max = Number.POSITIVE_INFINITY,
   decimals = 0,
   unit,
+  start,
 }: {
   id: string;
   /** Accessible name, e.g. "pH". */
@@ -30,6 +31,8 @@ export default function Stepper({
   max?: number;
   decimals?: number;
   unit?: string;
+  /** What the first tap on a blank value gives: a typical reading, not zero. */
+  start?: number;
 }) {
   const fmt = (n: number | null) => (n === null ? "" : n.toFixed(decimals));
   const [text, setText] = useState(fmt(value));
@@ -37,7 +40,12 @@ export default function Stepper({
 
   const clamp = (n: number) =>
     Math.round(Math.min(max, Math.max(min, n)) * 10 ** decimals) / 10 ** decimals;
-  const bump = (dir: 1 | -1) => onChange(clamp((value ?? (dir > 0 ? min : 0)) + dir * step));
+  const bump = (dir: 1 | -1) =>
+    onChange(
+      value === null
+        ? clamp(start ?? (dir > 0 ? min + step : min))
+        : clamp(value + dir * step),
+    );
 
   const btn =
     "grid h-11 w-11 shrink-0 place-items-center rounded-full border border-line bg-surface text-ink disabled:opacity-40";

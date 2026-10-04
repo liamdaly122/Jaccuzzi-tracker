@@ -4,27 +4,37 @@ import { useState } from "react";
 import type { SanitizerType } from "@/lib/chemistry";
 import type { NormalizedScan } from "@/lib/scan";
 import Icon from "./Icon";
+import { SourceLine, type SourceMessage } from "./IopoolButton";
 
 interface Props {
   sanitizerType: SanitizerType;
   // Called with the AI-read (and server-normalised) numbers when at least one
   // pad was read. The parent decides how to pre-fill its own fields.
   onValues: (values: NormalizedScan) => void;
+  /** When given, the parent shows the status line instead of this button. */
+  onMessage?: (m: SourceMessage | null) => void;
+  label?: string;
   className?: string;
 }
 
-// A self-contained "📷 Scan strip with camera" button. It opens the phone
+// A self-contained "Scan a strip" button. It opens the phone
 // camera, shrinks the photo in the browser (so it uploads and reads fast),
 // POSTs to /api/scan-strip, and hands the numbers back via onValues. Shared by
 // the reading form and the fresh-water setup wizard.
 export default function ScanStripButton({
   sanitizerType,
   onValues,
+  onMessage,
+  label = "Scan a strip",
   className = "",
 }: Props) {
   const [scanning, setScanning] = useState(false);
-  const [scanError, setScanError] = useState<string | null>(null);
-  const [scanFilled, setScanFilled] = useState(false);
+  const [message, setMessage] = useState<SourceMessage | null>(null);
+  const say = (m: SourceMessage | null) => {
+    setMessage(m);
+    onMessage?.(m);
+  };
+  const setScanError = (text: string) => say({ tone: "neutral", text });
 
   const rawBase64 = (dataUrl: string): string => {
     const comma = dataUrl.indexOf(",");
@@ -79,8 +89,7 @@ export default function ScanStripButton({
     if (!file) return;
 
     setScanning(true);
-    setScanError(null);
-    setScanFilled(false);
+    say(null);
     try {
       const { base64: imageBase64, mimeType } = await fileToScaledJpeg(file);
       const res = await fetch("/api/scan-strip", {
@@ -100,19 +109,24 @@ export default function ScanStripButton({
           v.calciumHardnessPpm != null;
         if (any) {
           onValues(v);
-          setScanFilled(true);
+          say({
+            tone: "warn",
+            text: `Filled in from your photo. Check each one against the strip, especially the ${
+              sanitizerType === "chlorine" ? "chlorine" : "bromine"
+            }.`,
+          });
         } else {
           setScanError(
-            "I couldn't read the pads clearly — please type the values in.",
+            "Couldn't read the pads clearly. Please enter the values yourself.",
           );
         }
       } else {
         setScanError(
-          data.error || "Couldn't read that photo — please type the values in.",
+          data.error || "Couldn't read that photo. Please enter the values yourself.",
         );
       }
     } catch {
-      setScanError("Couldn't read that photo — please type the values in.");
+      setScanError("Couldn't read that photo. Please enter the values yourself.");
     } finally {
       setScanning(false);
     }
@@ -120,29 +134,19 @@ export default function ScanStripButton({
 
   return (
     <div className={className}>
-      <label className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl border-2 border-dashed border-brand-300 bg-brand-50 px-4 py-3 text-sm font-semibold text-brand-700 transition hover:bg-brand-100">
+      <label className="inline-flex min-h-11 w-full cursor-pointer items-center justify-center gap-2 rounded-ctl border border-line bg-surface px-4 py-2.5 text-[15px] font-bold text-ink transition hover:bg-surface-2 has-[:disabled]:opacity-60">
         <input
           type="file"
           accept="image/*"
           capture="environment"
           onChange={onScanFile}
           disabled={scanning}
-          className="hidden"
+          className="sr-only"
         />
-        <Icon name="camera" size={18} />
-        {scanning ? "Reading your strip…" : "Scan strip with camera"}
+        <Icon name="camera" size={18} className="text-accent-ink" />
+        {scanning ? "Reading your strip…" : label}
       </label>
-      {scanFilled ? (
-        <p className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
-          <Icon name="sparkles" size={13} className="mr-1 inline align-[-2px]" />
-          I filled these in from your photo — please check every value against
-          the strip, especially the{" "}
-          {sanitizerType === "chlorine" ? "chlorine" : "bromine"}.
-        </p>
-      ) : null}
-      {scanError ? (
-        <p className="mt-2 text-xs text-slate-500">{scanError}</p>
-      ) : null}
+      {message && !onMessage ? <SourceLine message={message} /> : null}
     </div>
   );
 }

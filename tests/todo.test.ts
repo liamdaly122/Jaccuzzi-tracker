@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildTodos, heaterTodo, waterPills, withHeater, RANK, type TodoInput } from "../lib/todo";
+import { buildTodos, chemicalName, heaterTodo, waterPills, withHeater, RANK, type TodoInput } from "../lib/todo";
 import {
   calculateRecommendations,
   DEFAULT_DOSING_CONSTANTS,
@@ -235,5 +235,14 @@ describe("waterPills", () => {
 
   it("shows nothing it doesn't know", () => {
     expect(waterPills({ config, waterC: null, strip: null, probe: null })).toEqual([]);
+  });
+});
+
+describe("chemicalName", () => {
+  it("capitalises for a heading but leaves pH alone", () => {
+    expect(chemicalName("ta_increaser")).toBe("Alkalinity increaser");
+    expect(chemicalName("ph_decreaser")).toBe("pH decreaser");
+    expect(chemicalName("ta_decreaser")).toBe("pH/alkalinity decreaser");
+    expect(chemicalName(null)).toBeNull();
   });
 });

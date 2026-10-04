@@ -11,22 +11,15 @@ export default async function NewReadingPage() {
     const settings = await getSettings();
     const config = toSpaConfig(settings);
     return (
-      <div>
-        <h1 className="mb-4 text-xl font-bold text-slate-800">Test the water</h1>
-        <ReadingForm
-          sanitizerType={config.sanitizerType}
-          targetRanges={config.targetRanges}
-          scanEnabled={isScanConfigured()}
-          sanitizerUnit={config.sanitizerUnit}
-          iopoolEnabled={isIopoolConfigured()}
-        />
-      </div>
-    );
-  } catch (err) {
-    return (
-      <SetupNeeded
-        message={err instanceof Error ? err.message : "Unknown error"}
+      <ReadingForm
+        sanitizerType={config.sanitizerType}
+        targetRanges={config.targetRanges}
+        scanEnabled={isScanConfigured()}
+        sanitizerUnit={config.sanitizerUnit}
+        iopoolEnabled={isIopoolConfigured()}
       />
     );
+  } catch (err) {
+    return <SetupNeeded message={err instanceof Error ? err.message : "Unknown error"} />;
   }
 }

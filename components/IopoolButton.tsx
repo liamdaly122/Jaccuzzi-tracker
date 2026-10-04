@@ -4,41 +4,61 @@ import { useState } from "react";
 import Icon from "./Icon";
 import type { IopoolPool } from "@/lib/iopool-parse";
 
+export interface SourceMessage {
+  tone: "good" | "warn" | "neutral";
+  text: string;
+}
+
 interface Props {
   /** Called with the live probe values so the parent can pre-fill its fields. */
   onValues: (pool: IopoolPool) => void;
+  /** When given, the parent shows the status line instead of this button. */
+  onMessage?: (m: SourceMessage | null) => void;
+  label?: string;
   className?: string;
 }
 
-// "Read my probe" — pulls the latest pH / ORP / temperature straight from the
-// iopool EcO. Shared by the reading form and the setup wizard.
-export default function IopoolButton({ onValues, className = "" }: Props) {
+// "Use my probe": pulls the latest pH, ORP and temperature straight from the
+// iopool EcO. Shared by the test form and the setup wizard.
+export default function IopoolButton({ onValues, onMessage, label = "Use my probe", className = "" }: Props) {
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [filled, setFilled] = useState<IopoolPool | null>(null);
+  const [message, setMessage] = useState<SourceMessage | null>(null);
+
+  const say = (m: SourceMessage | null) => {
+    setMessage(m);
+    onMessage?.(m);
+  };
 
   async function read() {
     setLoading(true);
-    setError(null);
-    setFilled(null);
+    say(null);
     try {
-      const res = await fetch("/api/iopool");
+      const res = await fetch("/api/iopool?fresh=1");
       const data = await res.json();
       if (res.ok && data.pool) {
         const pool = data.pool as IopoolPool;
         onValues(pool);
-        setFilled(pool);
+        const m = pool.measure;
+        const ago =
+          m.ageMinutes === null
+            ? ""
+            : m.ageMinutes < 60
+              ? `, ${m.ageMinutes} min ago`
+              : `, ${Math.round(m.ageMinutes / 60)} h ago`;
+        say(
+          m.isValid
+            ? { tone: "good", text: `pH and ORP filled from your probe${ago}. Alkalinity still needs a strip.` }
+            : { tone: "warn", text: `Filled from your probe${ago}, but it says the reading is still settling, so treat it as rough.` },
+        );
       } else {
-        setError(data.error || "Couldn't read your probe just now.");
+        say({ tone: "neutral", text: data.error || "Couldn't read your probe just now." });
       }
     } catch {
-      setError("Couldn't read your probe just now.");
+      say({ tone: "neutral", text: "Couldn't read your probe just now." });
     } finally {
       setLoading(false);
     }
   }
-
-  const m = filled?.measure;
 
   return (
     <div className={className}>
@@ -46,29 +66,24 @@ export default function IopoolButton({ onValues, className = "" }: Props) {
         type="button"
         onClick={read}
         disabled={loading}
-        className="flex w-full items-center justify-center gap-2 rounded-xl border-2 border-emerald-300 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800 transition hover:bg-emerald-100 disabled:opacity-60"
+        className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-ctl border border-line bg-surface px-4 py-2.5 text-[15px] font-bold text-ink transition hover:bg-surface-2 disabled:opacity-60"
       >
-        <Icon name="bolt" size={18} />
-        {loading ? "Reading your probe…" : "Read my iopool probe"}
+        <Icon name="bolt" size={18} className="text-accent-ink" />
+        {loading ? "Reading your probe…" : label}
       </button>
-
-      {m ? (
-        <p className="mt-2 rounded-lg bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
-          <Icon name="check-circle" size={13} className="mr-1 inline align-[-2px]" />
-          Read from your probe
-          {m.ageMinutes !== null
-            ? m.ageMinutes < 60
-              ? ` ${m.ageMinutes} min ago`
-              : ` ${Math.round(m.ageMinutes / 60)} h ago`
-            : ""}
-          .{" "}
-          {m.isValid
-            ? "Alkalinity isn't measured by the probe — add it from a strip."
-            : "Your probe says this reading is still settling, so treat it as rough."}
-        </p>
-      ) : null}
-
-      {error ? <p className="mt-2 text-xs text-slate-500">{error}</p> : null}
+      {message && !onMessage ? <SourceLine message={message} /> : null}
     </div>
+  );
+}
+
+const LINE_TONE = { good: "text-good-ink", warn: "text-warn-ink", neutral: "text-ink-2" };
+
+/** The one line under the source buttons saying what got filled in. */
+export function SourceLine({ message }: { message: SourceMessage }) {
+  return (
+    <p className={`mt-2 flex items-start gap-2 text-[13.5px] font-semibold leading-snug ${LINE_TONE[message.tone]}`}>
+      <Icon name={message.tone === "good" ? "check-circle" : "alert-triangle"} size={16} className="mt-px shrink-0" />
+      <span>{message.text}</span>
+    </p>
   );
 }
