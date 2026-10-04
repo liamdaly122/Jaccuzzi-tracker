@@ -1,7 +1,6 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Card } from "@/components/ui";
-import Icon from "@/components/Icon";
+import PageHeader from "@/components/PageHeader";
+import { Callout, Card, Chip, LinkButton } from "@/components/ui";
 import {
   diagnose,
   type TroubleshootReading,
@@ -84,95 +83,62 @@ export default async function SymptomPage({ params }: { params: Params }) {
   const anyFlagged = diagnosis.causes.some((c) => c.flagged);
 
   return (
-    <div className="space-y-4">
-      <Link href="/troubleshoot" className="text-sm font-medium text-brand-600">
-        ← Other problems
-      </Link>
-      <div>
-        <h1 className="flex items-center gap-2.5 text-2xl font-bold text-slate-800">
-          <Icon name={diagnosis.symptom.icon} size={28} className="text-brand-600" />
-          {diagnosis.symptom.title}
-        </h1>
-        <p className="text-sm text-slate-500">{diagnosis.symptom.blurb}</p>
-      </div>
+    <div className="grid gap-[18px]">
+      <PageHeader
+        title={diagnosis.symptom.title}
+        subtitle={diagnosis.symptom.blurb}
+        back={{ href: "/troubleshoot", label: "Other problems" }}
+      />
 
       {diagnosis.hasReading ? (
         anyFlagged ? (
-          <Card className="border-amber-200 bg-amber-50">
-            <p className="text-sm text-amber-800">
-              💡 Based on your latest test, the most likely causes are marked{" "}
-              <strong>Likely for you</strong> and shown first.
-            </p>
-          </Card>
+          <Callout tone="warn" icon="bulb">
+            From your last test, the likeliest causes are marked and shown first.
+          </Callout>
         ) : (
-          <Card className="border-emerald-200 bg-emerald-50">
-            <p className="text-sm text-emerald-800">
-              Your latest test looks in range, so this probably isn&apos;t a
-              chemical-balance issue. Work through the causes below.
-            </p>
-          </Card>
+          <Callout tone="good" icon="check-circle">
+            Your last test was in range, so this probably isn&apos;t the chemicals. Work through
+            the causes below.
+          </Callout>
         )
       ) : (
-        <Card className="border-slate-200 bg-slate-50">
-          <p className="text-sm text-slate-600">
-            Log a{" "}
-            <Link href="/readings/new" className="font-medium text-brand-600">
-              test reading
-            </Link>{" "}
-            and I&apos;ll point straight at the most likely cause. For now,
-            here&apos;s the general list.
-          </p>
-        </Card>
+        <Callout tone="neutral" icon="flask">
+          Save a test and the likeliest cause gets marked. For now, here&apos;s the general list.
+        </Callout>
       )}
 
-      <div className="space-y-3">
+      <Card flush>
         {diagnosis.causes.map((c, i) => (
-          <Card
-            key={i}
-            className={c.flagged ? "border-amber-300 ring-1 ring-amber-200" : ""}
-          >
+          <div key={i} className="px-3.5 py-3.5 [&+&]:border-t [&+&]:border-line">
             <div className="flex items-start justify-between gap-2">
-              <p className="font-semibold text-slate-800">{c.cause}</p>
-              {c.flagged ? (
-                <span className="shrink-0 rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-medium text-amber-800">
-                  Likely for you
-                </span>
-              ) : null}
+              <p className="font-bold leading-snug">{c.cause}</p>
+              {c.flagged ? <Chip tone="warn">Likely for you</Chip> : null}
             </div>
-            <p className="mt-1 text-sm text-slate-600">{c.why}</p>
-            <p className="mt-2 text-sm text-slate-800">
-              <span className="font-medium">Fix: </span>
+            <p className="mt-1 text-[14px] leading-snug text-ink-2">{c.why}</p>
+            <p className="mt-2 text-[14.5px] leading-snug">
+              <span className="font-bold">Fix: </span>
               {c.fix}
             </p>
             {c.guideKey ? (
-              <Link
-                href={`/guides/${c.guideKey}`}
-                className="mt-2 inline-block text-sm font-medium text-brand-600"
-              >
-                Open the step-by-step guide →
-              </Link>
+              <LinkButton href={`/guides/${c.guideKey}`} variant="text" size="sm" className="-ml-3 mt-1">
+                Step-by-step guide
+              </LinkButton>
             ) : null}
-          </Card>
+          </div>
         ))}
-      </div>
+      </Card>
 
-      <div className="flex flex-wrap gap-3">
-        <Link
-          href="/readings/new"
-          className="inline-flex items-center justify-center rounded-xl bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-700"
-        >
+      <div className="flex flex-wrap gap-2">
+        <LinkButton href="/readings/new" className="min-w-[140px] flex-1">
           Test the water
-        </Link>
-        <Link
-          href="/guides"
-          className="inline-flex items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
-        >
-          Guides &amp; help
-        </Link>
+        </LinkButton>
+        <LinkButton href="/guides" variant="line" className="min-w-[140px] flex-1">
+          Guides
+        </LinkButton>
       </div>
 
-      <p className="text-center text-xs text-slate-400">
-        General guidance only — always follow your own product instructions.
+      <p className="text-center text-[13px] text-ink-3">
+        General guidance only. Always follow your own products&apos; instructions.
       </p>
     </div>
   );

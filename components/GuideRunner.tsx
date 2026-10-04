@@ -1,11 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { Guide } from "@/lib/guides";
-import { Button, Card } from "./ui";
+import { Button, Callout, Card, Meter, Row } from "./ui";
 import Icon from "./Icon";
+import Tick from "./Tick";
+import { useToast } from "./Toaster";
+import type { IconName } from "@/lib/icons";
 
 // Interactive checklist for a guide: tick steps off, watch the progress bar,
 // and (for guides that map to a maintenance task) finish by marking it done.
@@ -17,6 +19,7 @@ export default function GuideRunner({
   completesTaskId: number | null;
 }) {
   const router = useRouter();
+  const toast = useToast();
   // Progress is kept in the browser, not the database: some of these jobs run
   // over a weekend (winterising alone needs a day or two just for drying), and
   // losing your ticks because you closed the app makes the checklist useless.
@@ -82,131 +85,107 @@ export default function GuideRunner({
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ note: `Completed via "${guide.title}" guide` }),
-    });
+    }).catch(() => null);
     setFinishing(false);
-    if (res.ok) {
+    if (res?.ok) {
       setFinished(true);
       router.refresh();
+    } else {
+      toast("That didn't save. Check your connection and try again.");
     }
   }
 
-  return (
-    <div className="space-y-4">
-      <Card>
-        <p className="text-sm text-slate-600">{guide.intro}</p>
-        {/* Progress bar */}
-        <div className="mt-3">
-          <div className="mb-1 flex justify-between text-xs text-slate-500">
-            <span>
-              {doneCount} of {guide.steps.length} done
-            </span>
-            <span className="flex items-center gap-2">
-              {doneCount > 0 ? (
-                <button
-                  type="button"
-                  onClick={clearProgress}
-                  className="font-medium text-slate-400 underline underline-offset-2 hover:text-slate-600"
-                >
-                  Start again
-                </button>
-              ) : null}
-              <span>{pct}%</span>
-            </span>
-          </div>
-          <div className="h-2 overflow-hidden rounded-full bg-slate-100">
-            <div
-              className="h-full rounded-full bg-brand-500 transition-all"
-              style={{ width: `${pct}%` }}
-            />
-          </div>
-          {doneCount > 0 && doneCount < guide.steps.length ? (
-            <p className="mt-1.5 text-xs text-slate-400">
-              Your progress is saved on this device — close the app and pick up
-              where you left off.
-            </p>
-          ) : null}
-        </div>
-      </Card>
+  const next = NEXT[guide.key];
 
-      <ol className="space-y-2">
-        {guide.steps.map((step, i) => (
-          <li key={i}>
-            <button
-              onClick={() => toggle(i)}
-              className={`flex w-full gap-3 rounded-2xl border p-4 text-left transition ${
-                checked[i]
-                  ? "border-emerald-200 bg-emerald-50"
-                  : "border-slate-200 bg-white"
-              }`}
-            >
-              <span
-                className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 text-sm ${
-                  checked[i]
-                    ? "border-emerald-500 bg-emerald-500 text-white"
-                    : "border-slate-300 text-transparent"
-                }`}
-              >
-                ✓
-              </span>
-              <span>
-                <span
-                  className={`block font-semibold ${
-                    checked[i]
-                      ? "text-emerald-800 line-through"
-                      : "text-slate-800"
-                  }`}
-                >
-                  {i + 1}. {step.title}
-                </span>
-                <span className="mt-0.5 block text-sm text-slate-600">
-                  {step.detail}
-                </span>
-                {step.tip ? (
-                  <span className="mt-1 block text-xs text-brand-700">
-                    <Icon name="bulb" size={13} className="mr-1 inline align-[-2px]" />
-                    {step.tip}
-                  </span>
-                ) : null}
-              </span>
+  return (
+    <div className="grid gap-[18px]">
+      <p className="text-[15px] leading-relaxed text-ink-2">{guide.intro}</p>
+
+      <div>
+        <div className="flex items-center justify-between gap-2 text-[13.5px] font-semibold text-ink-3">
+          <span>
+            <span className="tabular-nums font-extrabold text-ink">{doneCount}</span> of {guide.steps.length} done
+          </span>
+          {doneCount > 0 ? (
+            <button type="button" onClick={clearProgress} className="-my-2 py-2 font-bold text-accent-ink">
+              Start again
             </button>
-          </li>
-        ))}
-      </ol>
+          ) : (
+            <span>Saved as you go</span>
+          )}
+        </div>
+        <Meter className="mt-1.5" value={pct / 100} tone={allDone ? "good" : "accent"} />
+      </div>
+
+      <Card flush>
+        <ol>
+          {guide.steps.map((step, i) => (
+            <li key={i} className="flex items-start gap-3 px-3.5 py-3 [&+&]:border-t [&+&]:border-line">
+              <Tick done={checked[i]} label={`Step ${i + 1}: ${step.title}`} onClick={() => toggle(i)} className="-mt-1.5" />
+              <div className="min-w-0 flex-1">
+                <p className="text-[12.5px] font-bold text-ink-3">Step {i + 1}</p>
+                <p className={`font-bold leading-snug ${checked[i] ? "text-ink-3 line-through decoration-[1.5px]" : ""}`}>
+                  {step.title}
+                </p>
+                <p className="mt-0.5 text-[14px] leading-snug text-ink-2">{step.detail}</p>
+                {step.tip ? (
+                  <p className="mt-1.5 flex gap-1.5 text-[13.5px] font-semibold leading-snug text-accent-ink">
+                    <Icon name="bulb" size={16} className="mt-px shrink-0" />
+                    <span>{step.tip}</span>
+                  </p>
+                ) : null}
+              </div>
+            </li>
+          ))}
+        </ol>
+      </Card>
 
       {completesTaskId ? (
         finished ? (
-          <div className="space-y-3">
-            <p className="text-center text-sm font-medium text-emerald-700">
-              ✓ Done and logged — your schedule and water freshness have reset.
-            </p>
-            {/* Fresh water needs balancing before anyone gets in — hand straight
-                over to the guided setup. */}
-            <Link
-              href="/setup"
-              className="flex items-center justify-between rounded-2xl border-2 border-brand-300 bg-brand-50 p-4"
-            >
-              <span>
-                <span className="block font-semibold text-slate-800">
-                  Now set up the new water
-                </span>
-                <span className="mt-0.5 block text-sm text-slate-600">
-                  Fresh water isn&apos;t safe until it&apos;s balanced. I&apos;ll
-                  walk you through it.
-                </span>
-              </span>
-              <span className="text-brand-600">→</span>
-            </Link>
-          </div>
+          <>
+            <Callout tone="good" icon="check-circle">
+              Done and logged. Your schedule and the water&apos;s age have reset.
+            </Callout>
+            {next ? <NextStep {...next} /> : null}
+          </>
         ) : (
-          <Button
-            onClick={markTaskDone}
-            disabled={finishing}
-            className={`w-full ${allDone ? "" : "opacity-70"}`}
-          >
-            {finishing ? "Saving…" : "Finish & mark done"}
+          <Button size="lg" block variant={allDone ? "primary" : "line"} onClick={markTaskDone} disabled={finishing}>
+            {finishing ? "Saving…" : "Finish and mark done"}
           </Button>
         )
+      ) : next ? (
+        <NextStep {...next} />
       ) : null}
     </div>
+  );
+}
+
+// Where each guide leads once it's done.
+const NEXT: Record<string, { href: string; icon: IconName; title: string; sub: string }> = {
+  "drain-and-refill-day": {
+    href: "/setup",
+    icon: "shower",
+    title: "Now set up the new water",
+    sub: "Fresh water isn't safe until it's balanced. Step by step from here.",
+  },
+  winterise: {
+    href: "/care",
+    icon: "snowflake",
+    title: "Go to winter plan",
+    sub: "Tell the app it's packed away, so the reminders pause.",
+  },
+  "spring-wake-up": {
+    href: "/setup",
+    icon: "shower",
+    title: "Set up the new water",
+    sub: "Balance the fresh fill before anyone gets in.",
+  },
+};
+
+function NextStep({ href, icon, title, sub }: { href: string; icon: IconName; title: string; sub: string }) {
+  return (
+    <Card tone="accent" flush>
+      <Row href={href} icon={icon} title={title} sub={sub} />
+    </Card>
   );
 }

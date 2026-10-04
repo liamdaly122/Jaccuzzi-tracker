@@ -201,7 +201,7 @@ export const GUIDES: Guide[] = [
       {
         title: "Tell the app you're done",
         detail:
-          "Mark the tub as hibernating on the Upkeep screen. The app will stop reminding you to test water that isn't there, and will wake you up again in spring.",
+          "Choose \"Pack it away\" in the winter plan on the Care tab. The app stops reminding you to test water that isn't there, and wakes you up again in spring.",
       },
     ],
   },
@@ -241,7 +241,7 @@ export const GUIDES: Guide[] = [
       {
         title: "Wake the app up",
         detail:
-          "Mark the tub as awake on the Upkeep screen so testing reminders, the calendar and the daily check all start again.",
+          "Tap \"Wake it up\" in the winter plan on the Care tab, so testing reminders, the calendar and the daily check all start again.",
       },
     ],
   },

@@ -13,6 +13,7 @@ import Link from "next/link";
 import Icon from "./Icon";
 import LogSheet from "./LogSheet";
 import WhyButton from "./WhyButton";
+import Tick from "./Tick";
 import { Chip, LinkButton } from "./ui";
 import { useCompleteJob } from "./useCompleteJob";
 import { useHeaterOn } from "./useHeaterOn";
@@ -33,26 +34,6 @@ export interface HeaterInputs {
   uaWPerK: number;
   schedule: HeatingSchedule | null;
   defaultReadyAtIso: string;
-}
-
-function Tick({ done, label, onClick }: { done: boolean; label: string; onClick: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-pressed={done}
-      aria-label={`${done ? "Undo" : "Mark done"}: ${label}`}
-      className="-my-2 -ml-2 -mr-1.5 grid h-11 w-11 shrink-0 place-items-center"
-    >
-      <span
-        className={`grid h-7 w-7 place-items-center rounded-full border-2 transition-colors ${
-          done ? "border-accent bg-accent text-on-accent" : "border-ink-3 text-transparent"
-        }`}
-      >
-        <Icon name="check" size={16} strokeWidth={3} />
-      </span>
-    </button>
-  );
 }
 
 export default function TodoList({
