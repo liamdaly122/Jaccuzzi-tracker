@@ -10,8 +10,9 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import Icon from "./Icon";
 import type { IconName } from "@/lib/icons";
+import type { Tone } from "@/lib/display";
 
-export type Tone = "neutral" | "accent" | "good" | "warn" | "bad" | "heat";
+export type { Tone };
 
 // --- Card --------------------------------------------------------------------
 

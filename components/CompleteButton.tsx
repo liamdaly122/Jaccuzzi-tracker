@@ -1,35 +1,34 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { Button } from "./ui";
+import { useCompleteJob } from "./useCompleteJob";
 
+// "Done" for one job. The toast that follows carries the Undo.
 export default function CompleteButton({
   taskId,
-  label = "Mark done",
+  name,
+  label = "Done",
 }: {
   taskId: number;
+  name: string;
   label?: string;
 }) {
-  const router = useRouter();
+  const complete = useCompleteJob();
   const [saving, setSaving] = useState(false);
 
-  async function complete() {
-    setSaving(true);
-    const res = await fetch(`/api/tasks/${taskId}/complete`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({}),
-    });
-    if (res.ok) {
-      router.refresh();
-    } else {
-      setSaving(false);
-    }
-  }
-
   return (
-    <Button variant="secondary" onClick={complete} disabled={saving}>
+    <Button
+      variant="line"
+      size="sm"
+      disabled={saving}
+      aria-label={`${label}: ${name}`}
+      onClick={async () => {
+        setSaving(true);
+        await complete(taskId, name);
+        setSaving(false);
+      }}
+    >
       {saving ? "…" : label}
     </Button>
   );

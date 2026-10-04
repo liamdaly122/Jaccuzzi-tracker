@@ -3,9 +3,10 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "./ui";
+import { useToast } from "./Toaster";
 
-// One-tap: set the drain & refill task's cadence to the recommended interval,
-// keeping maintenance_tasks as the single source of truth for scheduling.
+// One tap: set the drain & refill reminder to the interval worked out from the
+// tub's size and how much it's used. The task stays the one source of truth.
 export default function ApplyIntervalButton({
   taskId,
   intervalDays,
@@ -14,6 +15,7 @@ export default function ApplyIntervalButton({
   intervalDays: number;
 }) {
   const router = useRouter();
+  const toast = useToast();
   const [saving, setSaving] = useState(false);
 
   async function apply() {
@@ -23,16 +25,18 @@ export default function ApplyIntervalButton({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ frequencyDays: intervalDays }),
     });
+    setSaving(false);
     if (res.ok) {
+      toast(`Drain & refill reminder: every ${intervalDays} days`);
       router.refresh();
     } else {
-      setSaving(false);
+      toast("That didn't save. Try again in a moment.");
     }
   }
 
   return (
-    <Button variant="secondary" onClick={apply} disabled={saving} className="mt-3 w-full">
-      {saving ? "Updating…" : `Use this schedule (every ${intervalDays} days)`}
+    <Button variant="line" size="sm" onClick={apply} disabled={saving}>
+      {saving ? "Saving…" : `Use ${intervalDays} days`}
     </Button>
   );
 }

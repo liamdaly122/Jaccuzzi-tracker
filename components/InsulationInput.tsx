@@ -60,11 +60,11 @@ export default function InsulationInput({
 
   if (!open) {
     return (
-      <div className="mt-2 flex gap-3">
+      <div className="mt-2 flex flex-wrap gap-x-4">
         <button
           type="button"
           onClick={() => setOpen(true)}
-          className="text-xs font-medium text-brand-600 underline underline-offset-2"
+          className="-my-2 py-2 text-sm font-bold text-accent-ink underline underline-offset-[3px]"
         >
           {hasSaved ? "Change this figure" : "I've measured mine"}
         </button>
@@ -73,9 +73,9 @@ export default function InsulationInput({
             type="button"
             onClick={() => save(null)}
             disabled={state === "saving"}
-            className="text-xs font-medium text-slate-400 underline underline-offset-2"
+            className="-my-2 py-2 text-sm font-bold text-ink-2 underline underline-offset-[3px]"
           >
-            Use the measured one instead
+            Use the probe&apos;s figure instead
           </button>
         ) : null}
       </div>
@@ -83,43 +83,43 @@ export default function InsulationInput({
   }
 
   return (
-    <div className="mt-2 rounded-xl bg-slate-50 p-3">
-      <label className="block text-xs font-medium text-slate-600">
-        With the covers on and nobody in it, how many °C does it lose an hour?
-        <input
-          type="number"
-          inputMode="decimal"
-          step="0.01"
-          value={value}
-          onChange={(e) => setValue(e.target.value)}
-          placeholder="e.g. 0.1"
-          className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
-        />
+    <div className="mt-2 rounded-ctl bg-surface-2 p-3">
+      <label className="block text-sm font-bold text-ink-2" htmlFor="insulation-rate">
+        With the covers on and nobody in it, how many degrees does it lose an hour?
       </label>
-      <p className="mt-1.5 text-xs text-slate-400">
-        Leave it alone for a few hours and compare two probe readings. Converted
-        using the {deltaTK.toFixed(0)} °C difference between your water and the
-        air right now
-        {preview !== null ? `, which works out at ${preview.toFixed(1)} W/K` : ""}.
+      <input
+        id="insulation-rate"
+        type="number"
+        inputMode="decimal"
+        step="0.01"
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        placeholder="e.g. 0.1"
+        className="mt-1.5 w-full rounded-ctl border border-line bg-surface px-3 py-2.5 text-base"
+      />
+      <p className="mt-1.5 text-[13px] text-ink-2">
+        Leave it alone for a few hours and compare two probe readings. Worked out
+        using today&apos;s {deltaTK.toFixed(0)}° gap between water and air
+        {preview !== null ? `: ${preview.toFixed(1)} W/K` : ""}.
       </p>
       {state === "error" ? (
-        <p className="mt-1.5 text-xs text-red-700">
-          That didn&apos;t save — check the number and try again.
+        <p className="mt-1.5 text-[13px] font-semibold text-bad-ink">
+          That didn&apos;t save. Check the number and try again.
         </p>
       ) : null}
-      <div className="mt-2 flex gap-2">
+      <div className="mt-2.5 flex gap-2">
         <button
           type="button"
           disabled={preview === null || state === "saving"}
           onClick={() => preview !== null && save(preview)}
-          className="rounded-xl bg-brand-600 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-40"
+          className="min-h-10 rounded-ctl bg-accent px-4 text-sm font-bold text-on-accent disabled:opacity-40"
         >
           {state === "saving" ? "Saving…" : "Save"}
         </button>
         <button
           type="button"
           onClick={() => setOpen(false)}
-          className="rounded-xl border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-600"
+          className="min-h-10 rounded-ctl border border-line bg-surface px-4 text-sm font-bold text-ink"
         >
           Cancel
         </button>

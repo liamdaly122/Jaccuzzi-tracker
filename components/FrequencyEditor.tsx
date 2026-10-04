@@ -2,15 +2,21 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useToast } from "./Toaster";
 
+// "Every 7 days · Change" under a job, opening to a small inline editor.
 export default function FrequencyEditor({
   taskId,
   frequencyDays,
+  suffix,
 }: {
   taskId: number;
   frequencyDays: number;
+  /** Extra text after the cadence, e.g. "last 27 Sep". */
+  suffix?: string;
 }) {
   const router = useRouter();
+  const toast = useToast();
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState(String(frequencyDays));
   const [saving, setSaving] = useState(false);
@@ -23,52 +29,64 @@ export default function FrequencyEditor({
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ frequencyDays: days }),
-    });
+    }).catch(() => null);
     setSaving(false);
-    if (res.ok) {
+    if (res?.ok) {
       setEditing(false);
+      toast(`Now every ${days} day${days === 1 ? "" : "s"}`);
       router.refresh();
+    } else {
+      toast("That didn't save. Try again in a moment.");
     }
   }
 
   if (!editing) {
     return (
-      <button
-        onClick={() => setEditing(true)}
-        className="text-xs font-medium text-brand-600 hover:underline"
-      >
-        Every {frequencyDays} day{frequencyDays === 1 ? "" : "s"} · edit
-      </button>
+      <span className="text-[13.5px] text-ink-2">
+        Every {frequencyDays} day{frequencyDays === 1 ? "" : "s"}
+        {suffix ? ` · ${suffix}` : ""} ·{" "}
+        <button
+          type="button"
+          onClick={() => setEditing(true)}
+          className="-my-2 py-2 font-bold text-accent-ink underline underline-offset-[3px]"
+        >
+          Change
+        </button>
+      </span>
     );
   }
 
   return (
-    <div className="flex items-center gap-1.5">
-      <span className="text-xs text-slate-500">Every</span>
+    <span className="flex flex-wrap items-center gap-2 text-[13.5px] text-ink-2">
+      Every
       <input
         type="number"
+        inputMode="numeric"
+        aria-label="Days between"
         value={value}
         onChange={(e) => setValue(e.target.value)}
-        className="w-16 rounded-lg border border-slate-300 px-2 py-1 text-sm"
+        className="w-16 rounded-ctl border border-line bg-surface px-2 py-1.5 text-base text-ink"
         min={1}
       />
-      <span className="text-xs text-slate-500">days</span>
+      days
       <button
+        type="button"
         onClick={save}
         disabled={saving}
-        className="rounded-lg bg-brand-600 px-2 py-1 text-xs font-semibold text-white disabled:opacity-50"
+        className="min-h-9 rounded-ctl bg-accent px-3 font-bold text-on-accent disabled:opacity-50"
       >
         {saving ? "…" : "Save"}
       </button>
       <button
+        type="button"
         onClick={() => {
           setEditing(false);
           setValue(String(frequencyDays));
         }}
-        className="text-xs text-slate-400"
+        className="min-h-9 px-1 font-bold text-ink-2"
       >
         Cancel
       </button>
-    </div>
+    </span>
   );
 }

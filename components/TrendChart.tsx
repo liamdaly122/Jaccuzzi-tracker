@@ -1,8 +1,15 @@
-// Presentational, dependency-free line chart for a single metric over time.
-// Pure SVG (no chart library) so it stays self-contained and CSP-safe. Renders
-// server-side. Change-over-time is the data's job -> a line; single series, so
-// no legend (the title names it). An "ideal" band gives context, and points
-// outside it are amber (reinforced by position, so never colour-alone).
+"use client";
+
+// =============================================================================
+//  components/TrendChart.tsx
+//  One metric over time: a 2px line over its ideal band, the latest value
+//  labelled at the end, and a crosshair that snaps to the nearest reading under
+//  a finger or the pointer (arrow keys too). Points sit on a TIME axis, so a
+//  gap of four days looks like four days. Every value is also reachable as a
+//  table, so the tooltip never gates anything.
+// =============================================================================
+
+import { useMemo, useRef, useState } from "react";
 import { format } from "date-fns";
 
 export interface TrendPoint {
@@ -10,154 +17,205 @@ export interface TrendPoint {
   value: number | null;
 }
 
-interface Props {
-  title: string;
-  points: TrendPoint[]; // ordered oldest -> newest
-  idealMin: number;
-  idealMax: number;
-  unit?: string;
-  decimals?: number;
-  note?: string; // small caption, e.g. a trend direction
+export interface TrendSeries {
+  key: string;
+  label: string;
+  unit: string;
+  decimals: number;
+  /** The "aim for" band, when there is one. */
+  band?: [number, number] | null;
+  /** A single target line instead of a band (e.g. soak temperature). */
+  target?: number | null;
+  points: TrendPoint[];
+  /** Where the numbers came from, shown under the chart. */
+  source: string;
+  /** "day" labels as 21 Sep; "time" as 14:00 (for a 24-hour view). */
+  dateFormat?: "day" | "time";
 }
 
-// Ink / surface tokens (light mode) — text never wears the series colour.
-const INK = "#334155"; // slate-700
-const MUTED = "#94a3b8"; // slate-400
-const GRID = "#e2e8f0"; // slate-200
-const LINE = "#2385f0"; // brand-600 (the single series)
-const IN_RANGE = "#2385f0"; // brand-600
-const OUT_RANGE = "#f59e0b"; // amber-500 (status; position also signals it)
-const BAND = "rgba(16,185,129,0.12)"; // emerald tint = "good zone"
-const BAND_EDGE = "rgba(16,185,129,0.35)";
+const W = 340;
+const H = 168;
+const L = 8;
+const R = 46;
+const T = 16;
+const B = 24;
 
-export default function TrendChart({
-  title,
-  points,
-  idealMin,
-  idealMax,
-  unit = "",
-  decimals = 1,
-  note,
-}: Props) {
-  const data = points.filter(
-    (p): p is { date: string; value: number } => p.value !== null,
+export default function TrendChart({ series }: { series: TrendSeries }) {
+  const svg = useRef<SVGSVGElement>(null);
+  const [idx, setIdx] = useState<number | null>(null);
+  const [table, setTable] = useState(false);
+
+  const data = useMemo(
+    () =>
+      series.points
+        .filter((p): p is { date: string; value: number } => p.value !== null)
+        .map((p) => ({ ...p, t: new Date(p.date).getTime() }))
+        .filter((p) => Number.isFinite(p.t))
+        .sort((a, b) => a.t - b.t),
+    [series.points],
   );
+
+  const label = (iso: string) =>
+    format(new Date(iso), series.dateFormat === "time" ? "HH:mm" : "d MMM");
+  const fmt = (v: number) => `${v.toFixed(series.decimals)}${series.unit}`;
 
   if (data.length < 2) {
     return (
-      <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-        <h3 className="mb-1 font-semibold text-slate-800">{title}</h3>
-        <p className="text-sm text-slate-400">
-          Log at least two readings to see a trend here.
-        </p>
-      </div>
+      <p className="py-6 text-center text-sm text-ink-3">
+        Not enough readings yet to draw a trend.
+      </p>
     );
   }
 
-  const W = 340;
-  const H = 150;
-  const padL = 8;
-  const padR = 44;
-  const padT = 12;
-  const padB = 22;
-  const plotW = W - padL - padR;
-  const plotH = H - padT - padB;
+  const extra = [
+    ...(series.band ?? []),
+    ...(series.target != null ? [series.target] : []),
+  ];
+  let lo = Math.min(...data.map((d) => d.value), ...extra);
+  let hi = Math.max(...data.map((d) => d.value), ...extra);
+  const pad = (hi - lo) * 0.18 || 1;
+  lo -= pad;
+  hi += pad;
+  const t0 = data[0].t;
+  const t1 = data[data.length - 1].t;
+  const x = (t: number) => L + ((t - t0) / (t1 - t0 || 1)) * (W - L - R);
+  const y = (v: number) => T + (1 - (v - lo) / (hi - lo)) * (H - T - B);
 
-  const values = data.map((d) => d.value);
-  let yMin = Math.min(...values, idealMin);
-  let yMax = Math.max(...values, idealMax);
-  const span = yMax - yMin || 1;
-  yMin -= span * 0.12;
-  yMax += span * 0.12;
+  const line = data.map((d, i) => `${i ? "L" : "M"}${x(d.t).toFixed(1)},${y(d.value).toFixed(1)}`).join("");
+  const area = `${line}L${x(t1).toFixed(1)},${H - B}L${x(t0).toFixed(1)},${H - B}Z`;
+  const last = data[data.length - 1];
 
-  const n = data.length;
-  const x = (i: number) => padL + (n === 1 ? plotW / 2 : (i / (n - 1)) * plotW);
-  const y = (v: number) => padT + (1 - (v - yMin) / (yMax - yMin)) * plotH;
+  function nearest(clientX: number) {
+    const box = svg.current?.getBoundingClientRect();
+    if (!box) return;
+    const vx = ((clientX - box.left) / box.width) * W;
+    let best = 0;
+    data.forEach((d, i) => {
+      if (Math.abs(x(d.t) - vx) < Math.abs(x(data[best].t) - vx)) best = i;
+    });
+    setIdx(best);
+  }
 
-  const bandTop = y(idealMax);
-  const bandBottom = y(idealMin);
-
-  const linePath = data
-    .map((d, i) => `${i === 0 ? "M" : "L"}${x(i).toFixed(1)},${y(d.value).toFixed(1)}`)
-    .join(" ");
-
-  const last = data[n - 1];
-  const fmt = (v: number) => v.toFixed(decimals);
+  const sel = idx === null ? null : data[idx];
+  const scale = svg.current ? svg.current.getBoundingClientRect().width / W : 1;
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-      <div className="mb-1 flex items-baseline justify-between">
-        <h3 className="font-semibold text-slate-800">{title}</h3>
-        <span className="text-xs text-slate-400">
-          ideal {fmt(idealMin)}–{fmt(idealMax)}
-          {unit ? ` ${unit}` : ""}
-        </span>
+    <div>
+      <div className="relative mt-3">
+        <svg
+          ref={svg}
+          viewBox={`0 0 ${W} ${H}`}
+          className="block h-auto w-full touch-pan-y outline-offset-4"
+          role="img"
+          tabIndex={0}
+          aria-label={`${series.label}, latest ${fmt(last.value)}. Use the arrow keys to read each point.`}
+          onPointerMove={(e) => nearest(e.clientX)}
+          onPointerDown={(e) => nearest(e.clientX)}
+          onPointerLeave={() => setIdx(null)}
+          onFocus={() => setIdx(data.length - 1)}
+          onBlur={() => setIdx(null)}
+          onKeyDown={(e) => {
+            if (e.key === "ArrowLeft") {
+              e.preventDefault();
+              setIdx((i) => Math.max(0, (i ?? data.length - 1) - 1));
+            }
+            if (e.key === "ArrowRight") {
+              e.preventDefault();
+              setIdx((i) => Math.min(data.length - 1, (i ?? 0) + 1));
+            }
+          }}
+        >
+          {series.band ? (
+            <>
+              <rect
+                className="fill-good-soft"
+                x={L}
+                y={y(series.band[1])}
+                width={W - L - R}
+                height={Math.max(0, y(series.band[0]) - y(series.band[1]))}
+              />
+              <line className="stroke-good/50" x1={L} x2={W - R} y1={y(series.band[1])} y2={y(series.band[1])} />
+              <line className="stroke-good/50" x1={L} x2={W - R} y1={y(series.band[0])} y2={y(series.band[0])} />
+              <text className="fill-good-ink text-[11px] font-bold" x={L + 4} y={y(series.band[1]) - 4}>
+                Aim {series.band[0].toFixed(series.decimals)}–{series.band[1].toFixed(series.decimals)}
+                {series.unit}
+              </text>
+            </>
+          ) : null}
+          {series.target != null ? (
+            <>
+              <line className="stroke-heat" strokeWidth={1.5} x1={L} x2={W - R} y1={y(series.target)} y2={y(series.target)} />
+              <text className="fill-heat-ink text-[11px] font-bold" x={L + 4} y={y(series.target) - 5}>
+                Soak target {series.target}
+                {series.unit}
+              </text>
+            </>
+          ) : null}
+          <line className="stroke-line" x1={L} x2={W - R} y1={H - B} y2={H - B} />
+          <path className="fill-accent/10" d={area} />
+          <path className="fill-none stroke-accent" strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" d={line} />
+          <circle className="fill-accent stroke-surface" strokeWidth={2} cx={x(last.t)} cy={y(last.value)} r={4.5} />
+          <text className="fill-ink text-[12px] font-extrabold" x={x(last.t) + 8} y={y(last.value) + 4}>
+            {last.value.toFixed(series.decimals)}
+          </text>
+          <text className="fill-ink-3 text-[11px]" x={L} y={H - 6}>
+            {label(data[0].date)}
+          </text>
+          <text className="fill-ink-3 text-[11px]" x={W - R} y={H - 6} textAnchor="end">
+            {label(last.date)}
+          </text>
+          {sel ? (
+            <>
+              <line className="stroke-ink-3" x1={x(sel.t)} x2={x(sel.t)} y1={T} y2={H - B} />
+              <circle className="fill-accent stroke-surface" strokeWidth={2} cx={x(sel.t)} cy={y(sel.value)} r={5} />
+            </>
+          ) : null}
+        </svg>
+        {sel ? (
+          <div
+            className="pointer-events-none absolute top-0 -translate-x-1/2 -translate-y-[105%] whitespace-nowrap rounded-lg bg-ink px-2.5 py-1.5 text-[12.5px] leading-tight text-bg"
+            style={{
+              left: `${Math.min(W * scale - 44, Math.max(44, x(sel.t) * scale))}px`,
+              top: `${y(sel.value) * scale - 8}px`,
+            }}
+          >
+            <b className="text-sm">{fmt(sel.value)}</b>
+            <br />
+            {format(new Date(sel.date), series.dateFormat === "time" ? "EEE HH:mm" : "EEE d MMM, HH:mm")}
+          </div>
+        ) : null}
       </div>
-      {note ? <p className="mb-1 text-xs text-slate-500">{note}</p> : null}
-      <svg
-        viewBox={`0 0 ${W} ${H}`}
-        className="w-full"
-        role="img"
-        aria-label={`${title} over time, latest ${fmt(last.value)}${unit}`}
-      >
-        {/* Ideal band */}
-        <rect
-          x={padL}
-          y={bandTop}
-          width={plotW}
-          height={Math.max(0, bandBottom - bandTop)}
-          fill={BAND}
-        />
-        <line x1={padL} x2={padL + plotW} y1={bandTop} y2={bandTop} stroke={BAND_EDGE} strokeWidth={1} />
-        <line x1={padL} x2={padL + plotW} y1={bandBottom} y2={bandBottom} stroke={BAND_EDGE} strokeWidth={1} />
-
-        {/* Baseline */}
-        <line
-          x1={padL}
-          x2={padL + plotW}
-          y1={padT + plotH}
-          y2={padT + plotH}
-          stroke={GRID}
-          strokeWidth={1}
-        />
-
-        {/* Series line */}
-        <path d={linePath} fill="none" stroke={LINE} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
-
-        {/* Points (white ring; amber if out of ideal range) */}
-        {data.map((d, i) => {
-          const outOfRange = d.value < idealMin || d.value > idealMax;
-          return (
-            <circle
-              key={i}
-              cx={x(i)}
-              cy={y(d.value)}
-              r={4}
-              fill={outOfRange ? OUT_RANGE : IN_RANGE}
-              stroke="#ffffff"
-              strokeWidth={1.5}
-            >
-              <title>
-                {format(new Date(d.date), "d MMM")}: {fmt(d.value)}
-                {unit ? ` ${unit}` : ""}
-              </title>
-            </circle>
-          );
-        })}
-
-        {/* Direct label on the latest value */}
-        <text x={x(n - 1) + 6} y={y(last.value) + 3} fontSize={11} fill={INK} fontWeight={600}>
-          {fmt(last.value)}
-        </text>
-
-        {/* First / last date ticks */}
-        <text x={padL} y={H - 6} fontSize={10} fill={MUTED}>
-          {format(new Date(data[0].date), "d MMM")}
-        </text>
-        <text x={padL + plotW} y={H - 6} fontSize={10} fill={MUTED} textAnchor="end">
-          {format(new Date(last.date), "d MMM")}
-        </text>
-      </svg>
+      <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+        <span className="text-[13.5px] text-ink-2">{series.source}</span>
+        <button
+          type="button"
+          className="-my-2.5 py-2.5 text-sm font-bold text-accent-ink"
+          onClick={() => setTable((v) => !v)}
+          aria-expanded={table}
+        >
+          {table ? "Hide table" : "Show as table"}
+        </button>
+      </div>
+      {table ? (
+        <div className="mt-2 max-h-64 overflow-y-auto">
+          <table className="w-full border-collapse text-[13.5px]">
+            <thead>
+              <tr className="text-left text-ink-3">
+                <th scope="col" className="py-1.5 font-semibold">When</th>
+                <th scope="col" className="py-1.5 text-right font-semibold">{series.label}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {[...data].reverse().map((d) => (
+                <tr key={d.date} className="border-t border-line">
+                  <td className="py-1.5">{format(new Date(d.date), "EEE d MMM, HH:mm")}</td>
+                  <td className="num-tabular py-1.5 text-right">{fmt(d.value)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : null}
     </div>
   );
 }

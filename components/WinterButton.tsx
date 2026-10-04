@@ -3,23 +3,27 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "./ui";
+import { useToast } from "./Toaster";
 import type { WinterStrategy } from "@/lib/winter";
 
-// Puts the tub into (or out of) hibernation. Shutting down is a real decision
-// with a real consequence — the app goes quiet for months — so it asks first.
+// Records a winter plan, or clears it. Packing away quietens the app for
+// months, so it asks first and says what will happen.
 export default function WinterButton({
   action,
   strategy,
   label,
   confirm,
+  variant = "line",
 }: {
   action: "hibernate" | "wake";
   strategy?: WinterStrategy;
   label: string;
   /** Overrides the default confirmation text when the consequence differs. */
   confirm?: string;
+  variant?: "line" | "primary";
 }) {
   const router = useRouter();
+  const toast = useToast();
   const [state, setState] = useState<"idle" | "confirming" | "saving">("idle");
 
   async function submit() {
@@ -28,45 +32,38 @@ export default function WinterButton({
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ action, strategy: strategy ?? null }),
-    });
-    if (res.ok) {
+    }).catch(() => null);
+    if (res?.ok) {
+      toast(action === "wake" ? "Winter plan cleared" : "Winter plan saved");
       router.refresh();
       setState("idle");
     } else {
+      toast("That didn't save. Try again in a moment.");
       setState("confirming");
     }
   }
 
   if (state === "idle") {
     return (
-      <Button
-        variant={action === "wake" ? "primary" : "secondary"}
-        className="w-full"
-        onClick={() => setState("confirming")}
-      >
+      <Button variant={variant} size="sm" onClick={() => setState("confirming")}>
         {label}
       </Button>
     );
   }
 
   return (
-    <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-      <p className="text-sm text-slate-700">
+    <div className="w-full rounded-ctl bg-surface-2 p-3">
+      <p className="text-sm text-ink-2">
         {confirm ??
           (action === "hibernate"
-          ? "This stops the testing reminders and the daily check until you wake it up again. Frost warnings carry on if the tub is staying outside."
-          : "This starts the reminders and the daily check again. You'll want to run the fresh water setup once it's filled.")}
+            ? "This pauses the test reminders and the daily check until you wake it up. Frost warnings carry on if the tub stays outside."
+            : "This starts the reminders and the daily check again. Run the fresh water setup once it's filled.")}
       </p>
-      <div className="mt-2 flex gap-2">
-        <Button onClick={submit} disabled={state === "saving"} className="flex-1">
+      <div className="mt-2.5 grid grid-cols-2 gap-2">
+        <Button size="sm" onClick={submit} disabled={state === "saving"}>
           {state === "saving" ? "Saving…" : "Yes, do it"}
         </Button>
-        <Button
-          variant="ghost"
-          onClick={() => setState("idle")}
-          disabled={state === "saving"}
-          className="flex-1"
-        >
+        <Button size="sm" variant="line" onClick={() => setState("idle")} disabled={state === "saving"}>
           Cancel
         </Button>
       </div>

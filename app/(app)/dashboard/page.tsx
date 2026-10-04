@@ -599,7 +599,7 @@ export default async function DashboardPage() {
                     </Badge>
                   </div>
                 </div>
-                <CompleteButton taskId={row.id} />
+                <CompleteButton taskId={row.id} name={row.name} />
               </li>
             ))}
           </ul>
@@ -673,7 +673,7 @@ export default async function DashboardPage() {
         <RunningCostsCard
           summary={costs}
           seasonal={seasonal}
-          keepWarm={keepWarm}
+          ambientC={ambientC}
           basis={heatLoss.basis}
           standingLossCPerH={heatLoss.standingLossCPerH}
           impliedU={impliedUValue(heatLoss.uaWPerK, config.volumeLitres)}
