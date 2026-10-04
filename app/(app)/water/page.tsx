@@ -15,6 +15,7 @@ import TrendExplorer from "@/components/TrendExplorer";
 import type { TrendPoint, TrendSeries } from "@/components/TrendChart";
 import { Card, Chip, LinkButton, Meter, Row, Section, type Tone } from "@/components/ui";
 import { loadTubState } from "@/lib/tubState";
+import { ukClock } from "@/lib/clock";
 import { downsampleDaily } from "@/lib/probe";
 import { lsiSeries } from "@/lib/balance";
 import { linearTrend } from "@/lib/predict";
@@ -178,7 +179,7 @@ export default async function WaterPage() {
 
       <Section
         title="Last strip test"
-        aside={latest ? format(new Date(latest.recorded_at), "d MMM") : undefined}
+        aside={latest ? format(ukClock(latest.recorded_at), "d MMM") : undefined}
       >
         <Card flush>
           {latest ? (
@@ -291,7 +292,7 @@ export default async function WaterPage() {
                 key={`${e.icon}-${e.at}`}
                 icon={e.icon}
                 title={e.title}
-                sub={`${format(new Date(e.at), "EEE d MMM, HH:mm")}${e.sub ? ` · ${e.sub}` : ""}`}
+                sub={`${format(ukClock(e.at), "EEE d MMM, HH:mm")}${e.sub ? ` · ${e.sub}` : ""}`}
               />
             ))
           ) : (

@@ -11,7 +11,7 @@ export function useCompleteJob() {
   const toast = useToast();
 
   return useCallback(
-    async (taskId: number, name: string): Promise<boolean> => {
+    async (taskId: number, name: string, opts?: { onUndone?: () => void }): Promise<boolean> => {
       const res = await fetch(`/api/tasks/${taskId}/complete`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -28,6 +28,7 @@ export function useCompleteJob() {
             () => null,
           );
           if (undo?.ok) {
+            opts?.onUndone?.();
             router.refresh();
             toast(`${name}: not done`);
           } else {

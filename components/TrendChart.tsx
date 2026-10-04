@@ -11,6 +11,7 @@
 
 import { useMemo, useRef, useState } from "react";
 import { format } from "date-fns";
+import { ukClock } from "@/lib/clock";
 
 export interface TrendPoint {
   date: string; // ISO
@@ -56,7 +57,7 @@ export default function TrendChart({ series }: { series: TrendSeries }) {
   );
 
   const label = (iso: string) =>
-    format(new Date(iso), series.dateFormat === "time" ? "HH:mm" : "d MMM");
+    format(ukClock(iso), series.dateFormat === "time" ? "HH:mm" : "d MMM");
   const fmt = (v: number) => `${v.toFixed(series.decimals)}${series.unit}`;
 
   if (data.length < 2) {
@@ -181,7 +182,7 @@ export default function TrendChart({ series }: { series: TrendSeries }) {
           >
             <b className="text-sm">{fmt(sel.value)}</b>
             <br />
-            {format(new Date(sel.date), series.dateFormat === "time" ? "EEE HH:mm" : "EEE d MMM, HH:mm")}
+            {format(ukClock(sel.date), series.dateFormat === "time" ? "EEE HH:mm" : "EEE d MMM, HH:mm")}
           </div>
         ) : null}
       </div>
@@ -208,7 +209,7 @@ export default function TrendChart({ series }: { series: TrendSeries }) {
             <tbody>
               {[...data].reverse().map((d) => (
                 <tr key={d.date} className="border-t border-line">
-                  <td className="py-1.5">{format(new Date(d.date), "EEE d MMM, HH:mm")}</td>
+                  <td className="py-1.5">{format(ukClock(d.date), "EEE d MMM, HH:mm")}</td>
                   <td className="num-tabular py-1.5 text-right">{fmt(d.value)}</td>
                 </tr>
               ))}

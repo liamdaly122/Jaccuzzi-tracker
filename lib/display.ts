@@ -1,6 +1,7 @@
 // Shared display helpers (labels, colours, icons). Safe for client & server.
 import type { DueStatus, TaskType } from "./tasks";
 import type { IconName } from "./icons";
+import { APP_TIME_ZONE } from "./clock";
 
 export const taskTypeIcons: Record<TaskType, IconName> = {
   testing: "flask",
@@ -51,6 +52,7 @@ export function dueStatusTone(status: DueStatus): "red" | "amber" | "green" {
 // e.g. "24 Jul 2026" — stable, locale-independent.
 export function formatDate(d: Date): string {
   return d.toLocaleDateString("en-GB", {
+    timeZone: APP_TIME_ZONE,
     day: "numeric",
     month: "short",
     year: "numeric",
@@ -60,6 +62,7 @@ export function formatDate(d: Date): string {
 export function formatDateTime(iso: string): string {
   const d = new Date(iso);
   return d.toLocaleString("en-GB", {
+    timeZone: APP_TIME_ZONE,
     day: "numeric",
     month: "short",
     hour: "2-digit",

@@ -1,68 +1,79 @@
 "use client";
 
+// =============================================================================
+//  components/NavShell.tsx
+//  The frame around every screen: a phone-width column and the tab bar —
+//  Today, Water, + Log, Heat, Care. Each screen draws its own header.
+//  Sub-pages light up the tab they belong to.
+// =============================================================================
+
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useRouter } from "next/navigation";
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import type { IconName } from "@/lib/icons";
 import Icon from "./Icon";
+import LogSheet from "./LogSheet";
+import { ToastProvider } from "./Toaster";
 
-const navItems: { href: string; label: string; icon: IconName }[] = [
-  { href: "/dashboard", label: "Today", icon: "home" },
-  { href: "/readings/new", label: "Test", icon: "flask" },
-  { href: "/calendar", label: "Calendar", icon: "calendar" },
-  { href: "/tasks", label: "Upkeep", icon: "check-circle" },
-  { href: "/settings", label: "Settings", icon: "cog" },
+const TABS: { href: string; label: string; icon: IconName; also: string[] }[] = [
+  { href: "/dashboard", label: "Today", icon: "home", also: ["/settings"] },
+  { href: "/water", label: "Water", icon: "droplet", also: ["/history", "/readings"] },
+  { href: "/heat", label: "Heat", icon: "flame", also: [] },
+  { href: "/care", label: "Care", icon: "check-circle", also: ["/guides", "/troubleshoot"] },
 ];
 
 export default function NavShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
-  const router = useRouter();
+  const [logOpen, setLogOpen] = useState(false);
 
-  async function logout() {
-    await fetch("/api/logout", { method: "POST" });
-    router.replace("/login");
-    router.refresh();
-  }
+  const isActive = (t: (typeof TABS)[number]) =>
+    pathname === t.href ||
+    pathname.startsWith(`${t.href}/`) ||
+    t.also.some((p) => pathname === p || pathname.startsWith(`${p}/`));
+
+  const tab = (t: (typeof TABS)[number]) => {
+    const active = isActive(t);
+    return (
+      <Link
+        key={t.href}
+        href={t.href}
+        aria-current={active ? "page" : undefined}
+        className={`grid min-h-[54px] content-end justify-items-center gap-[3px] rounded-ctl px-0.5 pb-1 pt-1.5 text-[11.5px] font-semibold ${
+          active ? "text-accent-ink" : "text-ink-3"
+        }`}
+      >
+        <Icon name={t.icon} size={24} strokeWidth={active ? 2.3 : 1.8} />
+        {t.label}
+      </Link>
+    );
+  };
 
   return (
-    <div className="mx-auto flex min-h-screen w-full max-w-2xl flex-col">
-      <header className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-200 bg-white/90 px-4 py-3 backdrop-blur">
-        <Link href="/dashboard" className="flex items-center gap-2">
-          <Icon name="bath" size={22} className="text-brand-600" />
-          <span className="font-bold text-slate-800">Hot Tub Tracker</span>
-        </Link>
-        <button
-          onClick={logout}
-          className="text-sm font-medium text-slate-500 hover:text-slate-800"
+    <ToastProvider>
+      <div className="mx-auto flex min-h-screen w-full max-w-[440px] flex-col">
+        <main className="flex-1 px-4 pb-7 pt-2">{children}</main>
+        <nav
+          aria-label="Main"
+          className="sticky bottom-0 z-20 grid grid-cols-5 items-end border-t border-line bg-surface px-1.5 pb-[calc(6px+env(safe-area-inset-bottom,0px))] pt-1"
         >
-          Log out
-        </button>
-      </header>
-
-      <main className="flex-1 px-4 pb-24 pt-4">{children}</main>
-
-      <nav className="fixed bottom-0 left-1/2 z-20 w-full max-w-2xl -translate-x-1/2 border-t border-slate-200 bg-white">
-        <div className="grid grid-cols-5">
-          {navItems.map((item) => {
-            const active =
-              pathname === item.href ||
-              (item.href !== "/dashboard" && pathname.startsWith(item.href));
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={`flex flex-col items-center gap-0.5 py-2.5 text-xs font-medium transition ${
-                  active ? "text-brand-600" : "text-slate-400"
-                }`}
-              >
-                <Icon name={item.icon} size={22} strokeWidth={active ? 2 : 1.75} />
-                {item.label}
-              </Link>
-            );
-          })}
-        </div>
-      </nav>
-    </div>
+          {tab(TABS[0])}
+          {tab(TABS[1])}
+          <button
+            type="button"
+            onClick={() => setLogOpen(true)}
+            className="grid min-h-[54px] content-end justify-items-center gap-[3px] px-0.5 pb-1 text-[11.5px] font-semibold text-ink-2"
+            aria-label="Log something"
+          >
+            <span className="-mt-7 grid h-[58px] w-[58px] place-items-center rounded-full border-4 border-surface bg-accent text-on-accent shadow-lg">
+              <Icon name="plus" size={26} strokeWidth={2.6} />
+            </span>
+            Log
+          </button>
+          {tab(TABS[2])}
+          {tab(TABS[3])}
+        </nav>
+      </div>
+      <LogSheet open={logOpen} onClose={() => setLogOpen(false)} />
+    </ToastProvider>
   );
 }
