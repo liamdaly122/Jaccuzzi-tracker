@@ -4,7 +4,8 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useToast } from "./Toaster";
 
-// "Every 7 days · Change" under a job, opening to a small inline editor.
+// "Every 7 days · Change" under a job (with "Last done …" beneath), opening to
+// a small inline editor.
 export default function FrequencyEditor({
   taskId,
   frequencyDays,
@@ -12,7 +13,7 @@ export default function FrequencyEditor({
 }: {
   taskId: number;
   frequencyDays: number;
-  /** Extra text after the cadence, e.g. "last 27 Sep". */
+  /** A second line, e.g. "Last done Sun 27 Sep". */
   suffix?: string;
 }) {
   const router = useRouter();
@@ -42,16 +43,20 @@ export default function FrequencyEditor({
 
   if (!editing) {
     return (
-      <span className="text-[13.5px] text-ink-2">
-        Every {frequencyDays} day{frequencyDays === 1 ? "" : "s"}
-        {suffix ? ` · ${suffix}` : ""} ·{" "}
-        <button
-          type="button"
-          onClick={() => setEditing(true)}
-          className="-my-2 py-2 font-bold text-accent-ink underline underline-offset-[3px]"
-        >
-          Change
-        </button>
+      // Two fixed lines, so "Change" is never left on a line of its own.
+      <span className="block text-[13.5px] leading-snug text-ink-2">
+        <span className="block">
+          Every {frequencyDays} day{frequencyDays === 1 ? "" : "s"}
+          {" · "}
+          <button
+            type="button"
+            onClick={() => setEditing(true)}
+            className="-my-2 py-2 font-bold text-accent-ink underline underline-offset-[3px]"
+          >
+            Change
+          </button>
+        </span>
+        {suffix ? <span className="block">{suffix}</span> : null}
       </span>
     );
   }

@@ -81,12 +81,13 @@ export default function CareView({ s, view }: { s: TubState; view: "jobs" | "cal
                       <FrequencyEditor
                         taskId={row.id}
                         frequencyDays={row.frequency_days}
-                        suffix={row.last_completed_at ? `last ${shortDay(new Date(row.last_completed_at))}` : "not done yet"}
+                        suffix={row.last_completed_at ? `Last done ${shortDay(new Date(row.last_completed_at))}` : "Not done yet"}
                       />
                     </div>
                     <CompleteButton taskId={row.id} name={row.name} />
                   </div>
-                  <div className="flex items-center gap-2.5">
+                  {/* Indented to the text column, under the name rather than the icon. */}
+                  <div className="flex items-center gap-2.5 pl-12">
                     <Meter className="flex-1" value={life.fractionRemaining} tone={lifeTone(life.status, life.fractionRemaining)} />
                     <Chip tone={tone}>{when}</Chip>
                   </div>

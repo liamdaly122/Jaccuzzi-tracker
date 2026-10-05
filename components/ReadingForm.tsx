@@ -172,7 +172,7 @@ export default function ReadingForm({
           <Stepper id="t-ta" label="alkalinity" value={ta} onChange={setTa} step={10} min={0} max={400} unit="ppm" start={100} />
         </FieldRow>
         {orpMode ? (
-          <FieldRow name="ORP" hint={`Aim ${r.orpMin}–${r.orpMax}, from the probe`}>
+          <FieldRow name="ORP" hint={`Aim ${r.orpMin}–${r.orpMax}`}>
             <Stepper id="t-orp" label="ORP" value={orp} onChange={setOrp} step={10} min={0} max={1200} unit="mV" start={700} />
           </FieldRow>
         ) : null}
@@ -182,7 +182,7 @@ export default function ReadingForm({
         <FieldRow name="Calcium" hint="Optional">
           <Stepper id="t-ch" label="calcium" value={calcium} onChange={setCalcium} step={25} min={0} max={1000} unit="ppm" start={150} />
         </FieldRow>
-        <FieldRow name="Stabiliser" hint="Optional, every few weeks">
+        <FieldRow name="Stabiliser" hint="Optional, monthly">
           <Stepper id="t-cya" label="stabiliser" value={cya} onChange={setCya} step={10} min={0} max={300} unit="ppm" start={30} />
         </FieldRow>
       </Card>

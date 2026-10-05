@@ -54,7 +54,8 @@ describe("buildTodos — chemicals", () => {
   it("turns a strip test's dose into one short line, with the detail behind Why", () => {
     const r = buildTodos({ ...base, strip: strip({ totalAlkalinityPpm: 70 }, hoursAgo(1)) });
     const ta = r.items.find((i) => i.id === "dose:ta_increaser")!;
-    expect(ta.title).toBe("Add 85 g alkalinity increaser");
+    // The number and its unit are joined by a non-breaking space.
+    expect(ta.title).toBe("Add 85\u00a0g alkalinity increaser");
     expect(ta.sub).toMatch(/Alkalinity is low/);
     expect(ta.why?.paragraphs[0]).toMatch(/General guidance/);
     expect(ta.action).toEqual({ kind: "dose", chemical: "ta_increaser", grams: 85 });

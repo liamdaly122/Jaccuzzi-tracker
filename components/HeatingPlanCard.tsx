@@ -59,8 +59,9 @@ function duration(hours: number): string {
   const total = Math.round(hours * 60);
   const h = Math.floor(total / 60);
   const m = total % 60;
-  if (h === 0) return `${m} min`;
-  return m === 0 ? `${h} h` : `${h} h ${m} min`;
+  // Non-breaking spaces: "2 h 54 min" never splits across lines.
+  if (h === 0) return `${m}\u00a0min`;
+  return m === 0 ? `${h}\u00a0h` : `${h}\u00a0h\u00a0${m}\u00a0min`;
 }
 
 const money = (n: number) => (n < 1 ? `${Math.round(n * 100)}p` : `£${n.toFixed(2)}`);

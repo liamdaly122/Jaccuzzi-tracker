@@ -19,6 +19,7 @@ import { downsampleDaily } from "@/lib/probe";
 import { lsiSeries } from "@/lib/balance";
 import { linearTrend } from "@/lib/predict";
 import { CHEMICAL_LABELS } from "@/lib/types";
+import { chemicalName } from "@/lib/todo";
 import type { IconName } from "@/lib/icons";
 import type { WaterVerdictStatus } from "@/lib/water";
 
@@ -145,7 +146,7 @@ export default function WaterView({ s }: { s: TubState }) {
       key: `dose-${d.id}`,
       at: d.logged_at,
       icon: "droplet" as IconName,
-      title: `Added ${lowerFirst(CHEMICAL_LABELS[d.chemical] ?? d.chemical)}${Number(d.amount_grams) > 0 ? `, ${Number(d.amount_grams)} g` : ""}`,
+      title: `Added ${lowerFirst(chemicalName(d.chemical) ?? CHEMICAL_LABELS[d.chemical] ?? d.chemical)}${Number(d.amount_grams) > 0 ? `, ${Number(d.amount_grams)}\u00a0g` : ""}`,
     })),
     ...s.usageRows.slice(0, 5).map((u) => ({
       key: `soak-${u.id}`,

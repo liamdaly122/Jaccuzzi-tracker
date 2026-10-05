@@ -164,7 +164,7 @@ export default function CalendarView({
           )}
         </Card>
         <p className="px-0.5 text-[13.5px] text-ink-2">
-          Want these in your phone&apos;s calendar? The link is in Settings.
+          Add these to your phone&apos;s calendar from Settings.
         </p>
       </Section>
     </>

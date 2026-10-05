@@ -212,7 +212,7 @@ function Dose({
         {done ? (
           <span className="inline-flex items-center gap-1.5 text-[14.5px] font-bold text-good-ink">
             <Icon name="check" size={16} strokeWidth={2.6} />
-            Added {fmt(added)} g
+            Added {fmt(added)}{"\u00a0"}g
           </span>
         ) : editing ? (
           <>

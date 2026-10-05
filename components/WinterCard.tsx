@@ -130,8 +130,10 @@ export default function WinterCard({
                   {s.recommended ? <Chip tone="accent">Recommended</Chip> : null}
                 </div>
                 <p className="text-[13.5px] text-ink-2">{SHORT[s.key] ?? s.summary}</p>
+                {/* The cost gives way before the button does; only the confirm
+                    panel (full width) drops to its own line. */}
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  {cost ? <span className="num-tabular font-extrabold">{cost}</span> : <span />}
+                  {cost ? <span className="num-tabular min-w-0 flex-1 font-extrabold">{cost}</span> : <span className="flex-1" />}
                   <WinterButton
                     action="hibernate"
                     strategy={s.key}

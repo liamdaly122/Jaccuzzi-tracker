@@ -182,7 +182,8 @@ function doseTitle(rec: Recommendation): string {
   const name = rec.chemical ? DOSE_NAME[rec.chemical] : null;
   if (!name) return rec.label;
   if (rec.chemical === "ta_decreaser") return "Lower the alkalinity a little";
-  if (rec.amountGrams !== null) return `Add ${fmtGrams(rec.amountGrams)} g ${name}`;
+  // A non-breaking space keeps the number and its "g" on the same line.
+  if (rec.amountGrams !== null) return `Add ${fmtGrams(rec.amountGrams)}\u00a0g ${name}`;
   return `Add a little ${name}`;
 }
 
@@ -237,7 +238,8 @@ function jobSub(job: TodoJob): string {
   const every = `every ${row.frequency_days} day${row.frequency_days === 1 ? "" : "s"}`;
   if (life.status === "overdue" && life.daysUntilDue < 0) {
     const late = Math.abs(life.daysUntilDue);
-    return `${late === 1 ? "Due yesterday" : `${late} days overdue`} · ${every}`;
+    // Short enough to leave room for "· Why?" on the same line.
+    return late === 1 ? "Due yesterday" : `${late} days overdue`;
   }
   return every.charAt(0).toUpperCase() + every.slice(1);
 }
@@ -360,7 +362,7 @@ export function buildTodos(input: TodoInput): TodoResult {
         rank: cd.status === "overdue" ? RANK.overdue : RANK.dueToday,
         icon: "snowflake",
         title: "Decide your winter plan",
-        sub: cd.decidedBy === "forecast" ? `Frost forecast · ${by.toLowerCase()}` : by,
+        sub: cd.decidedBy === "forecast" ? `Frost forecast · ${by.charAt(0).toLowerCase()}${by.slice(1)}` : by,
         chip: { label: cd.status === "overdue" ? "Overdue" : `${Math.max(0, cd.daysUntil)} days`, tone: cd.status === "overdue" ? "bad" : "warn" },
         why: null,
         action: { kind: "link", href: "/care", label: "Look" },

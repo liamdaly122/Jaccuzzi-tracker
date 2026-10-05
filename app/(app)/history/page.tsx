@@ -54,7 +54,7 @@ export default async function HistoryPage() {
                 `pH ${r.ph}`,
                 `Alk ${r.total_alkalinity_ppm}`,
                 san !== null ? `${isChlorine ? "Cl" : "Br"} ${san}` : null,
-                r.orp_mv !== null ? `${r.orp_mv} mV` : null,
+                r.orp_mv !== null ? `${r.orp_mv}\u00a0mV` : null,
                 r.calcium_hardness_ppm !== null ? `Ca ${r.calcium_hardness_ppm}` : null,
               ].filter(Boolean);
               return (
@@ -84,7 +84,7 @@ export default async function HistoryPage() {
             {dosing.map((d) => (
               <Row
                 key={d.id}
-                title={`${CHEMICAL_LABELS[d.chemical]} · ${d.amount_grams} g`}
+                title={`${CHEMICAL_LABELS[d.chemical]} · ${d.amount_grams}\u00a0g`}
                 sub={
                   <>
                     {formatDateTime(d.logged_at)}

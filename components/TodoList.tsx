@@ -116,7 +116,7 @@ export default function TodoList({
       lead = <Tick done={heaterOn} label={it.title} onClick={() => setHeaterOn(!heaterOn)} />;
     } else {
       lead = (
-        <span className="grid h-7 w-7 shrink-0 place-items-center text-ink-3">
+        <span className="-my-2 -ml-2 -mr-1.5 grid h-11 w-11 shrink-0 place-items-center text-ink-3">
           <Icon name={it.icon} size={20} />
         </span>
       );
@@ -196,9 +196,11 @@ export default function TodoList({
               type="button"
               aria-expanded={laterOpen}
               onClick={() => setLaterOpen((v) => !v)}
-              className="flex min-h-[52px] w-full items-center gap-2.5 border-t border-line px-3.5 py-3.5 text-left font-bold text-accent-ink"
+              className="flex min-h-[52px] w-full items-center gap-3 border-t border-line px-3.5 py-3.5 text-left font-bold text-accent-ink"
             >
-              <Icon name="chevron" size={16} className={`transition-transform ${laterOpen ? "" : "-rotate-90"}`} />
+              <span className="-my-2 -ml-2 -mr-1.5 grid h-11 w-11 shrink-0 place-items-center">
+                <Icon name="chevron" size={16} className={`transition-transform ${laterOpen ? "" : "-rotate-90"}`} />
+              </span>
               {laterOpen ? "Hide the rest of the month" : `${later.length} more this month`}
             </button>
             {laterOpen
@@ -207,7 +209,7 @@ export default function TodoList({
                     {l.taskId ? (
                       <Tick done={ticked.has(l.id)} label={l.title} onClick={() => tickTask(l.id, l.taskId!, l.title)} />
                     ) : (
-                      <span className="grid h-7 w-7 shrink-0 place-items-center text-ink-3">
+                      <span className="-my-2 -ml-2 -mr-1.5 grid h-11 w-11 shrink-0 place-items-center text-ink-3">
                         <Icon name={l.icon} size={18} />
                       </span>
                     )}

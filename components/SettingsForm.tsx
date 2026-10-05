@@ -347,7 +347,7 @@ export default function SettingsForm({ settings, icsUrl, suggestions, observatio
               &ldquo;Subscribe from URL&rdquo;:
             </p>
             <div className="flex items-center gap-2">
-              <input readOnly value={icsUrl} aria-label="Calendar link" className={`${inputClass} min-w-0 truncate text-sm`} />
+              <input readOnly value={icsUrl} aria-label="Calendar link" className={`${inputClass} min-w-0 truncate`} />
               <Button
                 variant="line"
                 onClick={() => {

@@ -632,7 +632,7 @@ export default function SetupWizard({
         )}
 
         <details className="group">
-          <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 font-bold text-accent-ink">
+          <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 font-bold text-accent-ink [&::-webkit-details-marker]:hidden">
             <Icon name="chevron" size={16} className="-rotate-90 transition-transform group-open:rotate-0" />
             Added it? Test again
           </summary>

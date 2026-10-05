@@ -36,7 +36,7 @@ export interface TrendSeries {
 
 const W = 340;
 const H = 168;
-const L = 8;
+const L = 2; // just clear of the line's own thickness, so the chart starts on the text edge
 const R = 46;
 const T = 16;
 const B = 24;
