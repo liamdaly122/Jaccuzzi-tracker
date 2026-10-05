@@ -11,7 +11,7 @@ import {
   commissioningChlorineGrams,
   stagePhase,
 } from "@/lib/startup";
-import { Button, Callout, Card, LinkButton } from "./ui";
+import { Button, Callout, Card, FieldRow, LinkButton } from "./ui";
 import ScanStripButton from "./ScanStripButton";
 import IopoolButton, { SourceLine, type SourceMessage } from "./IopoolButton";
 import Stepper from "./Stepper";
@@ -340,27 +340,27 @@ export default function SetupWizard({
         </div>
       ) : null}
       <Card flush>
-        <StepRow name="pH">
+        <FieldRow name="pH">
           <Stepper id="w-ph" label="pH" value={toNum(ph)} onChange={(v) => setPh(toStr(v))} step={0.1} min={6} max={9} decimals={1} start={7.5} />
-        </StepRow>
-        <StepRow name="Alkalinity">
+        </FieldRow>
+        <FieldRow name="Alkalinity">
           <Stepper id="w-ta" label="alkalinity" value={toNum(ta)} onChange={(v) => setTa(toStr(v))} step={10} min={0} max={400} unit="ppm" start={100} />
-        </StepRow>
+        </FieldRow>
         {orpMode ? (
-          <StepRow name="ORP">
+          <FieldRow name="ORP">
             <Stepper id="w-orp" label="ORP" value={toNum(orp)} onChange={(v) => setOrp(toStr(v))} step={10} min={0} max={1200} unit="mV" start={700} />
-          </StepRow>
+          </FieldRow>
         ) : null}
-        <StepRow name={sanName}>
+        <FieldRow name={sanName}>
           <Stepper id="w-san" label={sanName.toLowerCase()} value={toNum(san)} onChange={(v) => setSan(toStr(v))} step={0.5} min={0} max={20} decimals={1} unit="ppm" start={3} />
-        </StepRow>
+        </FieldRow>
       </Card>
     </div>
   );
 
   if (finished) {
     return (
-      <div className="mx-auto grid min-h-screen max-w-[440px] content-center justify-items-center gap-3 px-4 py-16 text-center">
+      <div className="mx-auto grid min-h-dvh max-w-[440px] content-center justify-items-center gap-3 px-4 py-16 text-center">
         <div className="anim-pop grid h-24 w-24 place-items-center rounded-full bg-good-soft text-good-ink">
           <Icon name="check-seal" size={52} strokeWidth={1.5} />
         </div>
@@ -377,7 +377,7 @@ export default function SetupWizard({
   }
 
   return (
-    <div className="mx-auto flex min-h-screen w-full max-w-[440px] flex-col px-4 pb-[calc(16px+env(safe-area-inset-bottom,0px))] pt-[calc(14px+env(safe-area-inset-top,0px))]">
+    <div className="mx-auto flex min-h-dvh w-full max-w-[440px] flex-col px-4 pb-[calc(16px+env(safe-area-inset-bottom,0px))] pt-[calc(14px+env(safe-area-inset-top,0px))]">
       {/* Top bar: phase progress + exit */}
       <div className="mb-6">
         <div className="mb-2.5 flex items-center justify-between gap-2">
@@ -473,9 +473,9 @@ export default function SetupWizard({
       case "volume":
         return (
           <Card flush>
-            <StepRow name="Litres">
+            <FieldRow name="Litres">
               <Stepper id="w-volume" label="litres" value={toNum(volume)} onChange={(v) => setVolume(toStr(v))} step={10} min={100} max={5000} unit="L" start={1000} />
-            </StepRow>
+            </FieldRow>
           </Card>
         );
 
@@ -700,13 +700,4 @@ export default function SetupWizard({
       </Button>
     );
   }
-}
-
-function StepRow({ name, children }: { name: string; children: React.ReactNode }) {
-  return (
-    <div className="flex min-h-[64px] items-center justify-between gap-3 px-3.5 py-2 [&+&]:border-t [&+&]:border-line">
-      <p className="min-w-0 font-bold">{name}</p>
-      {children}
-    </div>
-  );
 }

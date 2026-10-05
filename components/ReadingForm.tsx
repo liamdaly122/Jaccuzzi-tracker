@@ -16,7 +16,7 @@ import type {
   TargetRanges,
 } from "@/lib/chemistry";
 import type { LsiSnapshot } from "@/lib/balance";
-import { Button, Callout, Card, inputClass } from "./ui";
+import { Button, Callout, Card, FieldRow, inputClass } from "./ui";
 import PageHeader from "./PageHeader";
 import Stepper from "./Stepper";
 import RecommendationList from "./RecommendationList";
@@ -32,18 +32,6 @@ interface Props {
 }
 
 type Num = number | null;
-
-function FieldRow({ name, hint, children }: { name: string; hint: string; children: React.ReactNode }) {
-  return (
-    <div className="flex min-h-[68px] items-center justify-between gap-3 px-3.5 py-2.5 [&+&]:border-t [&+&]:border-line">
-      <div className="min-w-0">
-        <p className="font-bold leading-snug">{name}</p>
-        <p className="text-[13px] leading-snug text-ink-3">{hint}</p>
-      </div>
-      {children}
-    </div>
-  );
-}
 
 export default function ReadingForm({
   sanitizerType,

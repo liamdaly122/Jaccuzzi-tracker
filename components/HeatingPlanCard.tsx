@@ -15,7 +15,9 @@
 import { useEffect, useMemo, useState } from "react";
 import Icon from "./Icon";
 import WhyButton from "./WhyButton";
-import { Button, Callout, Card, Section } from "./ui";
+import { Button, Callout, Card, FieldRow, Section } from "./ui";
+import Stepper from "./Stepper";
+import TimeStepper from "./TimeStepper";
 import { useToast } from "./Toaster";
 import { useHeaterOn } from "./useHeaterOn";
 import {
@@ -62,6 +64,16 @@ function duration(hours: number): string {
 }
 
 const money = (n: number) => (n < 1 ? `${Math.round(n * 100)}p` : `£${n.toFixed(2)}`);
+
+/** A small label with the answer large beneath it, both on the card's left edge. */
+function BigFigure({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <p className="text-[12.5px] font-bold text-ink-3">{label}</p>
+      <p className="num-tabular mt-0.5 text-[34px] font-extrabold leading-none text-heat-ink">{value}</p>
+    </div>
+  );
+}
 
 /** now → switch on → ready, drawn to scale. */
 function Timeline({ now, on, ready }: { now: Date; on: Date; ready: Date }) {
@@ -210,45 +222,32 @@ export default function HeatingPlanCard({
   );
   const hoursAvailable = Math.max(0, (readyAt.getTime() - now.getTime()) / HOUR_MS);
 
-  const stepBtn =
-    "grid h-11 w-11 shrink-0 place-items-center rounded-full border border-line bg-surface text-ink disabled:opacity-40";
+  const ready = mounted ? dayWord(readyAt, now) : "";
+  const fmtTemp = (n: number) => (n % 1 === 0 ? String(n) : n.toFixed(1));
 
   return (
     <>
       <Section title="Your soak">
-        <Card>
-          <div className="flex flex-wrap items-end gap-x-3.5 gap-y-3">
-            <label className="grid flex-auto gap-1">
-              <span className="text-[12.5px] font-bold text-ink-3">
-                Ready by{mounted ? ` · ${dayWord(readyAt, now)}` : ""}
-              </span>
-              <input
-                type="time"
-                value={readyTime}
-                onChange={(e) => e.target.value && setReadyTime(e.target.value)}
-                className="num-tabular min-h-[52px] w-full rounded-ctl border border-line bg-surface-2 px-3 py-2 text-[22px] font-extrabold"
-              />
-            </label>
-            <div className="grid shrink-0 gap-1">
-              <span className="text-[12.5px] font-bold text-ink-3">At</span>
-              <div className="flex items-center gap-1.5">
-                <button type="button" className={stepBtn} aria-label="Cooler" disabled={target <= TEMP_MIN_C} onClick={() => saveTarget(target - 0.5)}>
-                  <Icon name="minus" size={20} />
-                </button>
-                <output className="num-tabular grid w-[64px] justify-items-center text-[19px] font-extrabold leading-tight" aria-live="polite">
-                  {target % 1 === 0 ? target : target.toFixed(1)}°
-                  {target >= TEMP_MAX_C ? (
-                    <small className="text-[11.5px] font-semibold text-ink-3">tub&apos;s max</small>
-                  ) : null}
-                </output>
-                <button type="button" className={stepBtn} aria-label="Warmer" disabled={target >= TEMP_MAX_C} onClick={() => saveTarget(target + 0.5)}>
-                  <Icon name="plus" size={20} />
-                </button>
-              </div>
-            </div>
-          </div>
+        <Card flush>
+          <FieldRow name="Ready by" hint={ready ? ready.charAt(0).toUpperCase() + ready.slice(1) : "\u00a0"}>
+            <TimeStepper id="ready-by" label="Ready-by time" value={readyTime} onChange={setReadyTime} />
+          </FieldRow>
+          <FieldRow name="Temperature" hint={`Tub's max is ${TEMP_MAX_C}°`}>
+            <Stepper
+              id="soak-temp"
+              label="soak temperature"
+              value={target}
+              onChange={(v) => v !== null && saveTarget(v)}
+              step={0.5}
+              min={TEMP_MIN_C}
+              max={TEMP_MAX_C}
+              decimals={1}
+              format={fmtTemp}
+              unit="°C"
+            />
+          </FieldRow>
 
-          <div className="mt-3.5 grid grid-cols-7 gap-1.5" role="group" aria-label="Soak days">
+          <div className="grid grid-cols-7 gap-1.5 border-t border-line px-3.5 py-3" role="group" aria-label="Soak days">
             {DAY_LABELS.map((label, i) => {
               const on = days.includes(i);
               return (
@@ -266,30 +265,28 @@ export default function HeatingPlanCard({
             })}
           </div>
 
-          <div className="mt-3 flex flex-wrap items-center justify-between gap-2.5">
+          {/* Status on the left, its one action on the right: never wraps under. */}
+          <div className="grid min-h-[56px] grid-cols-[minmax(0,1fr)_auto] items-center gap-3 border-t border-line px-3.5 py-2.5">
             {!dirty && saved ? (
               <>
-                <span className="inline-flex items-center gap-1.5 text-sm font-bold text-good-ink">
-                  <Icon name="check-circle" size={16} />
-                  Saved · {describeDays(saved.weekdays)} at {saved.time}
+                <span className="flex min-w-0 items-center gap-1.5 text-sm font-bold text-good-ink">
+                  <Icon name="check-circle" size={16} className="shrink-0" />
+                  <span className="min-w-0">
+                    Saved · {describeDays(saved.weekdays)}, {saved.time}
+                  </span>
                 </span>
-                <button
-                  type="button"
-                  className="-my-2.5 py-2.5 text-sm font-bold text-ink-2 underline underline-offset-[3px]"
-                  disabled={saving}
-                  onClick={() => saveSchedule(null)}
-                >
+                <Button size="sm" variant="text" className="-mr-3" disabled={saving} onClick={() => saveSchedule(null)}>
                   Forget it
-                </button>
+                </Button>
               </>
             ) : (
               <>
-                <span className="text-[13.5px] text-ink-2">
+                <span className="min-w-0 text-[13.5px] leading-snug text-ink-2">
                   {saved ? "Changed, not saved yet." : patternNote ?? "Save it and the morning reminder follows it."}
                 </span>
                 <Button
                   size="sm"
-                  disabled={saving || days.length === 0}
+                  disabled={saving || days.length === 0 || !readyTime}
                   onClick={() => saveSchedule({ enabled: true, weekdays: sortedDays, time: readyTime })}
                 >
                   {saving ? "Saving…" : "Save"}
@@ -322,10 +319,7 @@ export default function HeatingPlanCard({
             </Callout>
           ) : heaterOn ? (
             <>
-              <div className="flex flex-wrap items-baseline justify-between gap-2">
-                <span className="text-[12.5px] font-bold text-ink-3">Heater</span>
-                <span className="text-[30px] font-extrabold leading-none text-heat-ink">On</span>
-              </div>
+              <BigFigure label="Heater" value="On" />
               <p className="mt-2 text-[13.5px] text-ink-2">
                 Ready {dayWord(readyAt, now)} at {clock(readyAt)}, {target}°.
               </p>
@@ -335,10 +329,7 @@ export default function HeatingPlanCard({
             </>
           ) : plan.tooLate ? (
             <>
-              <div className="flex flex-wrap items-baseline justify-between gap-2">
-                <span className="text-[12.5px] font-bold text-ink-3">Switch on</span>
-                <span className="text-[30px] font-extrabold leading-none text-heat-ink">Now</span>
-              </div>
+              <BigFigure label="Switch on" value="Now" />
               <p className="mt-2 text-[13.5px] text-ink-2">
                 You&apos;d reach about{" "}
                 <b>{reachableByC(currentC, hoursAvailable, ambientC, watts, volumeLitres, uaWPerK)}°</b>{" "}
@@ -350,14 +341,10 @@ export default function HeatingPlanCard({
             </>
           ) : plan.switchOnAt ? (
             <>
-              <div className="flex flex-wrap items-baseline justify-between gap-2">
-                <span className="text-[12.5px] font-bold text-ink-3">
-                  Switch on {dayWord(plan.switchOnAt, now) === "today" ? "at" : dayWord(plan.switchOnAt, now) + " at"}
-                </span>
-                <span className="num-tabular text-[30px] font-extrabold leading-none text-heat-ink">
-                  {clock(plan.switchOnAt)}
-                </span>
-              </div>
+              <BigFigure
+                label={`Switch on ${dayWord(plan.switchOnAt, now) === "today" ? "at" : `${dayWord(plan.switchOnAt, now)} at`}`}
+                value={clock(plan.switchOnAt)}
+              />
               <Timeline now={now} on={plan.switchOnAt} ready={readyAt} />
               <p className="mt-2 text-[13.5px] text-ink-2">
                 {currentC}° to {target}° takes {duration(plan.hours - BUFFER_MINUTES / 60)}, plus half an

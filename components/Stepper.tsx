@@ -20,6 +20,7 @@ export default function Stepper({
   decimals = 0,
   unit,
   start,
+  format,
 }: {
   id: string;
   /** Accessible name, e.g. "pH". */
@@ -33,8 +34,10 @@ export default function Stepper({
   unit?: string;
   /** What the first tap on a blank value gives: a typical reading, not zero. */
   start?: number;
+  /** How the number is shown, e.g. "40" rather than "40.0". */
+  format?: (n: number) => string;
 }) {
-  const fmt = (n: number | null) => (n === null ? "" : n.toFixed(decimals));
+  const fmt = (n: number | null) => (n === null ? "" : format ? format(n) : n.toFixed(decimals));
   const [text, setText] = useState(fmt(value));
   useEffect(() => setText(fmt(value)), [value]); // eslint-disable-line react-hooks/exhaustive-deps
 

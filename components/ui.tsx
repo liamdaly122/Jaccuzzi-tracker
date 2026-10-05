@@ -227,6 +227,30 @@ export function Row({
   );
 }
 
+/**
+ * A setting or reading in a flush card: name and hint on the left, a control
+ * (usually a Stepper) on the right, centred on the row.
+ */
+export function FieldRow({
+  name,
+  hint,
+  children,
+}: {
+  name: ReactNode;
+  hint?: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <div className="flex min-h-[68px] items-center justify-between gap-3 px-3.5 py-2.5 [&+&]:border-t [&+&]:border-line">
+      <div className="min-w-0">
+        <p className="font-bold leading-snug">{name}</p>
+        {hint ? <p className="text-[13px] leading-snug text-ink-3">{hint}</p> : null}
+      </div>
+      {children}
+    </div>
+  );
+}
+
 // --- Buttons -------------------------------------------------------------------
 
 type Variant = "primary" | "quiet" | "line" | "text";

@@ -50,11 +50,13 @@ export default function NavShell({ children }: { children: ReactNode }) {
 
   return (
     <ToastProvider>
-      <div className="mx-auto flex min-h-screen w-full max-w-[440px] flex-col">
-        <main className="flex-1 px-4 pb-7 pt-2">{children}</main>
+      <div className="mx-auto min-h-dvh w-full max-w-[440px]">
+        {/* Room at the bottom for the bar, the raised + and the home bar. */}
+        <main className="px-4 pb-[calc(104px+env(safe-area-inset-bottom,0px))] pt-2">{children}</main>
+        {/* Fixed, so it's on screen however far down the page you are. */}
         <nav
           aria-label="Main"
-          className="sticky bottom-0 z-20 grid grid-cols-5 items-end border-t border-line bg-surface px-1.5 pb-[calc(6px+env(safe-area-inset-bottom,0px))] pt-1"
+          className="fixed inset-x-0 bottom-0 z-20 mx-auto grid w-full max-w-[440px] grid-cols-5 items-end border-t border-line bg-surface px-1.5 pb-[calc(6px+env(safe-area-inset-bottom,0px))] pt-1"
         >
           {tab(TABS[0])}
           {tab(TABS[1])}

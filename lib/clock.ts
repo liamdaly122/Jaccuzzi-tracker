@@ -29,3 +29,25 @@ export function ukClock(d: Date | string | number): Date {
     Number(parts.find((p) => p.type === type)?.value ?? 0);
   return new Date(get("year"), get("month") - 1, get("day"), get("hour"), get("minute"), get("second"));
 }
+
+// --- Quarter-hour steps for a "HH:MM" time ---------------------------------------
+
+const STEP_MIN = 15;
+const DAY_MIN = 24 * 60;
+const pad2 = (n: number) => String(n).padStart(2, "0");
+
+function toMinutes(t: string): number | null {
+  const m = /^(\d{1,2}):(\d{2})$/.exec(t);
+  return m ? Number(m[1]) * 60 + Number(m[2]) : null;
+}
+
+/** One quarter-hour step, snapping an odd time (19:40) to the next quarter. */
+export function stepTime(t: string, dir: 1 | -1, fallback = "19:30"): string {
+  const m = toMinutes(t) ?? toMinutes(fallback)!;
+  const next =
+    dir > 0
+      ? Math.floor(m / STEP_MIN) * STEP_MIN + STEP_MIN
+      : Math.ceil(m / STEP_MIN) * STEP_MIN - STEP_MIN;
+  const v = ((next % DAY_MIN) + DAY_MIN) % DAY_MIN;
+  return `${pad2(Math.floor(v / 60))}:${pad2(v % 60)}`;
+}

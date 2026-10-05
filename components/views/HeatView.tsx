@@ -77,7 +77,7 @@ export default function HeatView({ s }: { s: TubState }) {
                     {i === 0 ? "Today" : format(new Date(`${d.date}T12:00:00`), "EEE")}
                   </span>
                   <Icon name={dayIcon(d)} size={20} className="text-ink-2" />
-                  <b className="num-tabular text-lg">{Math.round(d.tempMax)}°</b>
+                  <b className="text-lg">{Math.round(d.tempMax)}°</b>
                   <span className="text-[13px] text-ink-2">{Math.round(d.tempMin)}° low</span>
                 </div>
               ))}
